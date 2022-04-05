@@ -5,12 +5,10 @@ A = Predicate('A', torch.tensor([[0.1,0.5,0,0.8]]).t())
 B = Predicate('B', torch.tensor([[0.4,0.2,0.6,0.1]]).t())
 C = Predicate('C', torch.tensor([[0.6,0.1,0.8,0.3]]).t())
 f = AND([NOT(A),OR([B,C])])
-print(f.get_name())
-
 
 print('Before:')
 
-print('Predicates final values:\nA')
+print('Predicates initial values:\nA')
 print(A.value)
 print('B')
 print(B.value)
