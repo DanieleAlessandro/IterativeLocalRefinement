@@ -53,12 +53,22 @@ class Predicate(Formula):
         super().__init__(None)
         self.name = name
         self.value = value
+        self.deltas = []
 
     def forward(self):
         return self.value
 
     def backward(self, delta):
-        self.value = self.value + delta
+        self.deltas.append(delta)
+
+    def update(self):
+        deltas = torch.concat(self.deltas, 1)
+        abs_deltas = deltas.abs()
+
+        i = torch.argmax(abs_deltas, 1)
+
+        self.value = self.value + torch.gather(deltas, 1, torch.unsqueeze(i, 1))
+        self.deltas = []
 
     def get_name(self, parenthesis=False):
         return self.name
