@@ -2,6 +2,7 @@ from Formula import *
 from Godel import *
 import os
 import numpy as np
+import pickle
 
 def parse_cnf(in_data):
     cnf = list()
@@ -97,11 +98,10 @@ for filename in os.listdir('uf20-91'):
             else:
                 predicate.update('max')
 
-results = []
+# results = []
 for i, formula in enumerate(sat_results):
     print(str(i) + ':   ' + str(np.mean(formula)))
-    results.append(np.mean(formula))
+    # results.append(np.mean(formula))
 
-import pickle
 with open('results', 'wb') as f:
-    pickle.dump(results, f)
+    pickle.dump(sat_results, f)
