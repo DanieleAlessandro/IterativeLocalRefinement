@@ -10,10 +10,11 @@ B = Predicate('B', torch.tensor([[0.4,0.2,0.6,0.1]]).t())
 C = Predicate('C', torch.tensor([[0.6,0.1,0.8,0.5]]).t())
 
 # FIXED behaviour:
-# C = Predicate('C', torch.tensor([[0.6,0.5,0.8,0.5]]).t())
+# C = Predicate('C', torch.tensor([[0.6,0.5,0.8,0.5]]).t()) (for w < 1)
 
 # f = AND([NOT(A),OR([A,C])])
-f = AND([OR([NOT(A),NOT(B)]),OR([A,C])])
+# f = AND([OR([NOT(A),NOT(B)]),OR([A,C])])
+f = AND([OR([NOT(A),B]),OR([A,C])])
 
 
 print('Before:')
@@ -28,7 +29,7 @@ print(C.value)
 initial_value = f.forward()
 f.print_table()
 
-n_iterations = 10
+n_iterations = 2
 
 for _ in range(n_iterations):
     initial_value = f.forward()
@@ -36,7 +37,7 @@ for _ in range(n_iterations):
     delta = (1 - initial_value)
     f.backward(delta)
     A.update()
-    # B.update()
+    B.update()
     C.update()
 
 print('After:')
