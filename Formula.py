@@ -41,8 +41,10 @@ class Formula:
         self.input_tensor = torch.concat(inputs, 1)
         return self.function(self.input_tensor)
 
-    def backward(self, delta):
+    def backward(self, delta, randomized=False):
         deltas = self.boost_function(self.input_tensor, delta)
+        if randomized:
+            deltas = deltas * torch.rand(deltas.shape)
 
         for sf, d in zip(self.sub_formulas, deltas.t()):
             sf.backward(torch.unsqueeze(d, 0).t())
@@ -61,14 +63,36 @@ class Predicate(Formula):
     def backward(self, delta):
         self.deltas.append(delta)
 
-    def update(self):
-        deltas = torch.concat(self.deltas, 1)
-        abs_deltas = deltas.abs()
+    def update(self, method='max'):
+        if method == 'most_clauses':
+            deltas = torch.concat(self.deltas, 1)
+            positive = torch.sum(deltas > 0., 1, keepdim=True) - torch.sum(deltas <= 0., 1, keepdim=True) >= 0
+            max, _ = torch.max(deltas, 1, keepdim=True)
+            min, _ = torch.min(deltas, 1, keepdim=True)
 
-        i = torch.argmax(abs_deltas, 1)
+            self.value = self.value + torch.where(positive, max, min)
+            self.deltas = []
+        if method == 'mean':
+            deltas = torch.concat(self.deltas, 1)
 
-        self.value = self.value + torch.gather(deltas, 1, torch.unsqueeze(i, 1))
-        self.deltas = []
+            self.value = self.value + torch.mean(deltas, 1, keepdim=True)
+            self.deltas = []
+        if method == 'max':
+            deltas = torch.concat(self.deltas, 1)
+            abs_deltas = deltas.abs()
+
+            i = torch.argmax(abs_deltas, 1, keepdim=True)
+
+            self.value = self.value + torch.gather(deltas, 1, i)
+            self.deltas = []
+        if method == 'min':
+            deltas = torch.concat(self.deltas, 1)
+            abs_deltas = deltas.abs()
+
+            i = torch.argmin(abs_deltas, 1, keepdim=True)
+
+            self.value = self.value + torch.gather(deltas, 1, i)
+            self.deltas = []
 
     def get_name(self, parenthesis=False):
         return self.name
