@@ -1,14 +1,14 @@
 from Godel import *
 from Formula import *
-from LRL import LRL
+from LRL import *
 
 
-class Model(torch.nn.Module):
-    def __init__(self, formula, n_layers, backward):
+class LRLModel(torch.nn.Module):
+    def __init__(self, formula, n_layers):
         super().__init__()
         self.layers = []
         for _ in range(n_layers):
-            self.layers.append(LRL(formula, backward))
+            self.layers.append(LRL(formula))
 
     def forward(self, truth_values):
         x = torch.sigmoid(truth_values)
@@ -18,41 +18,58 @@ class Model(torch.nn.Module):
         return x
 
 
+class LTNModel(torch.nn.Module):
+    def __init__(self, formula):
+        super().__init__()
+        self.layer = LTN(formula)
+
+    def forward(self, truth_values):
+        return self.layer(torch.sigmoid(truth_values), 1.)
 
 
+# Define the settings of the experiments
+lrl = True  # If false, then we use LTN
+number_of_steps = 2
+
+
+# Define the knowledge
 A = Predicate('A', 0)
 B = Predicate('B', 1)
 C = Predicate('C', 2)
-
-# FIXED behaviour:
-# C = Predicate('C', torch.tensor([[0.6,0.5,0.8,0.5]]).t()) (for w < 1)
 
 # f = AND([NOT(A),OR([A,C])])
 # f = AND([OR([NOT(A),NOT(B)]),OR([A,C])])
 f = AND([OR([NOT(A),B]),OR([A,C])])
 
-number_of_steps = 2
-
-m = Model(f, number_of_steps, True)
-# m = Model(f, 1, False)
-
-
-
-
+# Define the initial truth values and pre-activations
 t = torch.tensor([[0.1,0.5,0,0.8],[0.4,0.2,0.6,0.1],[0.6,0.1,0.8,0.5]]).t()
 z = torch.nn.Parameter(torch.logit(t), requires_grad=True)
-# t = torch.nn.Parameter(t, requires_grad=True)
 
-print('Before:')
+# Define the model
+if lrl:
+    m = LRLModel(f, number_of_steps)
+else:
+    m = LTNModel(f)
+
+
+print('Before optimization:')
 print(t)
-print('After')
-print(m(z))
-# optimizer = torch.optim.SGD([z], lr=1.)
-#
-# for i in range(number_of_steps):
-#     s = - torch.sum(m(z))
-#     s.backward()
-#     optimizer.step()
-#
-# print(m(z))
-# print(torch.sigmoid(z))
+
+print('After optimization:')
+if lrl:
+    print('Truth values:')
+    print(m(z))
+    print('Satisfaction of the constraints:')
+    print(f.forward(m(z)))
+else:
+    optimizer = torch.optim.SGD([z], lr=1.)
+
+    for i in range(number_of_steps):
+        s = - torch.sum(m(z))
+        s.backward()
+        optimizer.step()
+
+    print('Truth values:')
+    print(torch.sigmoid(z))
+    print('Satisfaction of the constraints:')
+    print(m(z))
