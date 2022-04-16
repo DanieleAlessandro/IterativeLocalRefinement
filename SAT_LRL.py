@@ -94,9 +94,9 @@ for filename in os.listdir('uf20-91'):
 
         for predicate in predicates:
             if i <= 0:
-                predicate.update('most_clauses')
+                predicate.aggregate_deltas('most_clauses')
             else:
-                predicate.update('max')
+                predicate.aggregate_deltas('max')
 
 # results = []
 for i, formula in enumerate(sat_results):

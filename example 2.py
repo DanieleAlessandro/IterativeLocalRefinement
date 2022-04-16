@@ -36,9 +36,9 @@ for _ in range(n_iterations):
     # f.print_table()
     delta = (1 - initial_value)
     f.backward(delta)
-    A.update()
-    B.update()
-    C.update()
+    A.aggregate_deltas()
+    B.aggregate_deltas()
+    C.aggregate_deltas()
 
 print('After:')
 f.print_table()

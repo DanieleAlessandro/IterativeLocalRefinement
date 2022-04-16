@@ -19,9 +19,9 @@ initial_value = f.forward()
 f.print_table()
 delta = (1 - initial_value) * 0.5
 f.backward(delta)
-A.update()
-B.update()
-C.update()
+A.aggregate_deltas()
+B.aggregate_deltas()
+C.aggregate_deltas()
 
 print('After:')
 f.print_table()
