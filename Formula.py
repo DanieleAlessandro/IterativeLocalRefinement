@@ -32,7 +32,7 @@ class Formula:
 
     def __str__(self):
         s = self.get_name() + '\n'
-        s += str(self.input_tensor)
+        # s += str(self.input_tensor)
 
         return s
 
@@ -60,12 +60,23 @@ class Formula:
         deltas = []
         for p in self.predicates:
             i, d = p.aggregate_deltas(method)
+            p.reset_deltas()
             indices.append(i)
             deltas.append(d)
 
         delta_tensor = torch.zeros_like(truth_values)
         delta_tensor[..., indices] = torch.concat(deltas, 1)
         return delta_tensor
+
+    def reset_deltas(self):
+        for p in self.predicates:
+            p.reset_deltas()
+
+    def satisfaction(self, truth_values):
+        s = self.forward(truth_values)
+        self.reset_deltas()
+
+        return s
 
 
 class Predicate(Formula):
@@ -82,6 +93,9 @@ class Predicate(Formula):
     def backward(self, delta, randomized=False):  # TODO: implement the usage of randomized
         self.deltas.append(delta)
 
+    def reset_deltas(self):
+        self.deltas = []
+
     def aggregate_deltas(self, method):
         if method == 'most_clauses':
             deltas = torch.concat(self.deltas, 1)
@@ -89,12 +103,10 @@ class Predicate(Formula):
             max, _ = torch.max(deltas, 1, keepdim=True)
             min, _ = torch.min(deltas, 1, keepdim=True)
 
-            self.deltas = []
             return self.index, torch.where(positive, max, min)
         if method == 'mean':
             deltas = torch.concat(self.deltas, 1)
 
-            self.deltas = []
             return self.index, torch.mean(deltas, 1, keepdim=True)
         if method == 'max':
             deltas = torch.concat(self.deltas, 1)
@@ -102,7 +114,6 @@ class Predicate(Formula):
 
             i = torch.argmax(abs_deltas, 1, keepdim=True)
 
-            self.deltas = []
             return self.index, torch.gather(deltas, 1, i)
         if method == 'min':
             deltas = torch.concat(self.deltas, 1)
@@ -110,7 +121,6 @@ class Predicate(Formula):
 
             i = torch.argmin(abs_deltas, 1, keepdim=True)
 
-            self.deltas = []
             return self.index, torch.gather(deltas, 1, i)
 
     def get_name(self, parenthesis=False):

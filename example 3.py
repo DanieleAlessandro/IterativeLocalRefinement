@@ -1,35 +1,12 @@
 from Godel import *
 from Formula import *
-from LRL import *
-
-
-class LRLModel(torch.nn.Module):
-    def __init__(self, formula, n_layers):
-        super().__init__()
-        self.layers = []
-        for _ in range(n_layers):
-            self.layers.append(LRL(formula))
-
-    def forward(self, truth_values):
-        x = torch.sigmoid(truth_values)
-        for l in self.layers:
-            x = l(x, 1.)
-
-        return x
-
-
-class LTNModel(torch.nn.Module):
-    def __init__(self, formula):
-        super().__init__()
-        self.layer = LTN(formula)
-
-    def forward(self, truth_values):
-        return self.layer(torch.sigmoid(truth_values), 1.)
+from logical_layers import *
+from utils import *
 
 
 # Define the settings of the experiments
-lrl = True  # If false, then we use LTN
-number_of_steps = 2
+lrl = True  # If True, use LRL. If False, LTN
+number_of_steps = 2  # Number of optimization steps
 
 
 # Define the knowledge
@@ -53,14 +30,18 @@ else:
 
 
 print('Before optimization:')
-print(t)
+print('Truth values:')
+print(torch.sigmoid(z))
+print('Satisfaction of the constraints:')
+print(f.satisfaction(torch.sigmoid(z)))
+
 
 print('After optimization:')
 if lrl:
     print('Truth values:')
     print(m(z))
     print('Satisfaction of the constraints:')
-    print(f.forward(m(z)))
+    print(f.satisfaction(m(z)))
 else:
     optimizer = torch.optim.SGD([z], lr=1.)
 
@@ -73,3 +54,5 @@ else:
     print(torch.sigmoid(z))
     print('Satisfaction of the constraints:')
     print(m(z))
+
+# TODO: capire perche valori di verita negativi per LRL
