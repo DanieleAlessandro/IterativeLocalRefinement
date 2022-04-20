@@ -39,7 +39,9 @@ def initialize_pre_activations(number_of_variables, number_of_trials):
     """
     z = (torch.rand([number_of_trials, number_of_variables]) - 0.5) * 10
 
-    return z, torch.nn.Parameter(torch.clone(z), requires_grad=True)
+    yield z
+    while True:
+        yield torch.nn.Parameter(torch.clone(z), requires_grad=True)  # TODO: check if it works properly
 
 
 def create_predicates(number_of_variables):
@@ -66,11 +68,39 @@ def create_formula(predicates, clauses):
     return AND(or_sub_formulas)
 
 
+def defuzzify(tensor):
+    return (tensor > 0.5).float()
+
+
+def defuzzify_list(tensors_list):
+    return [defuzzify(tensor) for tensor in tensors_list]
+
+
+def evaluate_solutions(formula, predictions_list, initial_predictions):
+    '''Returns the level of satisfaction of ain interpretation of a formula and the L1 norm of the delta values.
+
+    :param formula: the formula to be optimized
+    :param predictions_list: a list of predictions, each corresponding to a specific optimization step
+    :param initial_predictions: the initial random interpretation
+    :return: a list of satisfaction levels, one for each step; a list of l1 norms of the change with respect the
+    initial value
+    '''
+    satisfactions = []
+    norms = []
+
+    for predictions in predictions_list:
+        satisfactions.append(torch.mean(formula.satisfaction(predictions)).tolist())
+        norms.append(torch.linalg.vector_norm(predictions - initial_predictions, ord=1).tolist())
+
+    return satisfactions, norms
+
+
 class LRLModel(torch.nn.Module):
-    def __init__(self, formula, n_layers):
+    def __init__(self, formula, n_layers, w):
         super().__init__()
         self.formula = formula
         self.layers = []
+        self.w = w
         for _ in range(n_layers):
             self.layers.append(LRL(formula))
 
@@ -78,7 +108,7 @@ class LRLModel(torch.nn.Module):
         predictions = [torch.sigmoid(pre_activations)]
 
         for l in self.layers:
-            predictions.append(l(predictions[-1], 1.))
+            predictions.append(l(predictions[-1], self.w))  # TODO: need to check
 
         return predictions
 
