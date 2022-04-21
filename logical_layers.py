@@ -9,7 +9,14 @@ class LRL(torch.nn.Module):
     def forward(self, truth_values, w):
         satisfaction = self.formula.forward(truth_values)
 
-        delta_sat = (1. - satisfaction) * w
+        # delta_sat = (1. - satisfaction) * w  # TODO: which one?
+        # delta_sat = torch.where(1. - satisfaction < w, (1. - satisfaction).double(), w).float()
+        condition = w - satisfaction > 0
+        if torch.sum(condition.int()) == 0:
+            return None
+
+        delta_sat = torch.where(w - satisfaction > 0, (w - satisfaction).double(), 0.).float() / 10
+
         self.formula.backward(delta_sat)
         delta_tensor = self.formula.get_delta_tensor(truth_values)
 
