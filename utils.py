@@ -108,7 +108,11 @@ class LRLModel(torch.nn.Module):
         predictions = [torch.sigmoid(pre_activations)]
 
         for l in self.layers:
-            predictions.append(l(predictions[-1], self.w))  # TODO: need to check
+            next_prediction = l(predictions[-1], self.w)
+            if next_prediction is None:
+                break
+
+            predictions.append(next_prediction)  # TODO: need to check
 
         return predictions
 
