@@ -76,7 +76,7 @@ def defuzzify_list(tensors_list):
     return [defuzzify(tensor) for tensor in tensors_list]
 
 
-def evaluate_solutions(formula, predictions_list, initial_predictions):
+def evaluate_solutions(formula, predictions_list, initial_predictions, fuzzy=True):
     '''Returns the level of satisfaction of ain interpretation of a formula and the L1 norm of the delta values.
 
     :param formula: the formula to be optimized
@@ -87,12 +87,21 @@ def evaluate_solutions(formula, predictions_list, initial_predictions):
     '''
     satisfactions = []
     norms = []
+    if fuzzy:
+        for predictions in predictions_list:
+            satisfactions.append(torch.mean(formula.satisfaction(predictions)).tolist())
+            norms.append(torch.linalg.vector_norm(predictions - initial_predictions, ord=1).tolist())
 
-    for predictions in predictions_list:
-        satisfactions.append(torch.mean(formula.satisfaction(predictions)).tolist())
-        norms.append(torch.linalg.vector_norm(predictions - initial_predictions, ord=1).tolist())
+        return satisfactions, norms
+    else:
+        n_clauses = []
 
-    return satisfactions, norms
+        for predictions in predictions_list:
+            satisfactions.append(torch.mean(formula.satisfaction(predictions)).tolist())
+            norms.append(torch.linalg.vector_norm(predictions - initial_predictions, ord=1).tolist())
+            n_clauses.append(torch.mean(formula.sat_sub_formulas(predictions)).tolist())
+
+        return satisfactions, norms, n_clauses
 
 
 class LRLModel(torch.nn.Module):

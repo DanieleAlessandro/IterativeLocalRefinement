@@ -25,9 +25,17 @@ class AND(Formula):
         else:
             return s
 
-    def sat_sub_formulas(self):
-        m = torch.mean(self.input_tensor, 1, keepdim=True)
-        return m.t()
+    def sat_sub_formulas(self, truth_values):
+        inputs = []
+        for sf in self.sub_formulas:
+            inputs.append(sf.satisfaction(truth_values))
+
+        if len(inputs) > 1:
+            sf_satisfaction = torch.concat(inputs, 1)
+        else:
+            sf_satisfaction = inputs[0]
+
+        return torch.mean(sf_satisfaction, 1, keepdim=True)
 
     def count_ones(self):
         return torch.sum((self.input_tensor == 1.).int(), 1, keepdim=True).float()

@@ -21,9 +21,9 @@ n_trials = 30  # TODO: 10 trials??
 n_steps = 100
 
 # Variable settings
-targets = [0.75, 0.9, 1.0]  # 0.5,  list of target truth values
+targets = [0.5, 0.75, 0.9, 1.0]  # 0.5,  list of target truth values
 
-lr_list = [0.1]  # , 0.01, 0.001]
+lr_list = [0.1, 0.01]#, 0.001]
 regularization_lambda_list = [0.01, 0.0]  # [0.5, 0.1, 0.01, 0.0]
 
 start_time = time.time()
@@ -59,15 +59,16 @@ for filename in os.listdir('uf20-91')[:10]:  # TODO: rimuovere [:2]
 
         # Evaluation
         lrl_sat_f, lrl_norm_f = evaluate_solutions(f, lrl_predictions, initial_truth_values)
-        lrl_sat_c, lrl_norm_c = evaluate_solutions(f, defuzzify_list(lrl_predictions), defuzzify(initial_truth_values))
+        lrl_sat_c, lrl_norm_c, lrl_n_clauses = evaluate_solutions(f, defuzzify_list(lrl_predictions), defuzzify(initial_truth_values), fuzzy=False)
 
-        results_lrl.append({
+        results_lrl.append({  #_f: fuzzy truth values used, _c: classic logic (defuzzified)
             'formula': filename,
             'target': t,
             'sat_f': lrl_sat_f,
             'sat_c': lrl_sat_c,
             'norm_f': lrl_norm_f,
-            'norm_c': lrl_norm_c
+            'norm_c': lrl_norm_c,
+            'n_clauses_satisfied_c':lrl_n_clauses
         })
         print('LRL: ' + str(torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()))
 
@@ -93,9 +94,11 @@ for filename in os.listdir('uf20-91')[:10]:  # TODO: rimuovere [:2]
 
                 # Evaluation
                 ltn_sat_f, ltn_norm_f = evaluate_solutions(f, ltn_predictions, initial_truth_values)
-                ltn_sat_c, ltn_norm_c = evaluate_solutions(f, defuzzify_list(ltn_predictions), defuzzify(initial_truth_values))
+                ltn_sat_c, ltn_norm_c, ltn_n_clauses = evaluate_solutions(f,
+                                                                          defuzzify_list(ltn_predictions),
+                                                                          defuzzify(initial_truth_values), fuzzy=False)
 
-                results_ltn.append({
+                results_ltn.append({  # TODO: add count of clauses satisfied
                     'formula': filename,
                     'target': t,
                     'lr': lr,
@@ -103,7 +106,8 @@ for filename in os.listdir('uf20-91')[:10]:  # TODO: rimuovere [:2]
                     'sat_f': ltn_sat_f,
                     'sat_c': ltn_sat_c,
                     'norm_f': ltn_norm_f,
-                    'norm_c': ltn_norm_c
+                    'norm_c': ltn_norm_c,
+                    'n_clauses_satisfied_c': ltn_n_clauses
                 })
                 print('LTN: ' + str(torch.mean(f.satisfaction(ltn_predictions[-1])).tolist()))
 
