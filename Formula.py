@@ -1,5 +1,6 @@
 import torch
 from prettytable import PrettyTable
+import random
 
 
 class Formula:
@@ -55,7 +56,7 @@ class Formula:
         for sf, d in zip(self.sub_formulas, deltas.t()):
             sf.backward(torch.unsqueeze(d, 0).t())
 
-    def get_delta_tensor(self, truth_values, method='max'):
+    def get_delta_tensor(self, truth_values, method='mean'):
         indices = []
         deltas = []
         for p in self.predicates:
@@ -107,7 +108,7 @@ class Predicate(Formula):
         if method == 'mean':
             deltas = torch.concat(self.deltas, 1)
 
-            return self.index, torch.mean(deltas, 1, keepdim=True)
+            return self.index, torch.nan_to_num(torch.sum(deltas, 1, keepdim=True) / torch.sum(deltas != 0.0, 1, keepdim=True))
         if method == 'max':
             deltas = torch.concat(self.deltas, 1)
             abs_deltas = deltas.abs()
@@ -117,11 +118,28 @@ class Predicate(Formula):
             return self.index, torch.gather(deltas, 1, i)
         if method == 'min':
             deltas = torch.concat(self.deltas, 1)
+            deltas = torch.where(deltas == 0, 100., deltas.double()).float()
             abs_deltas = deltas.abs()
 
             i = torch.argmin(abs_deltas, 1, keepdim=True)
+            final_deltas = torch.gather(deltas, 1, i)
 
-            return self.index, torch.gather(deltas, 1, i)
+            return self.index, torch.where(final_deltas == 100., 0.0, final_deltas.double()).float()
+        if method == 'randomized_direction':
+            deltas = torch.concat(self.deltas, 1)
+            abs_deltas = deltas.abs()
+
+            if random.getrandbits(1):
+                deltas_no_zeros = torch.where(abs_deltas == 0, 100., abs_deltas.double()).float()
+                i = torch.argmin(deltas_no_zeros, 1, keepdim=True)
+                final_deltas = torch.gather(deltas, 1, i)
+
+                return self.index, torch.where(final_deltas == 100., 0.0, final_deltas.double()).float()
+            else:
+                i = torch.argmax(abs_deltas, 1, keepdim=True)
+
+                return self.index, torch.gather(deltas, 1, i)
+
 
     def get_name(self, parenthesis=False):
         return self.name
