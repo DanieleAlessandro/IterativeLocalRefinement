@@ -113,11 +113,11 @@ class LRLModel(torch.nn.Module):
         for _ in range(n_layers):
             self.layers.append(LRL(formula))
 
-    def forward(self, pre_activations):
+    def forward(self, pre_activations, method):
         predictions = [torch.sigmoid(pre_activations)]
 
         for l in self.layers:
-            next_prediction = l(predictions[-1], self.w)
+            next_prediction = l(predictions[-1], self.w, method)
             if next_prediction is None:
                 break
 
@@ -132,4 +132,4 @@ class LTNModel(torch.nn.Module):
         self.layer = LTN(formula)
 
     def forward(self, truth_values):  # Returns the satisfaction of the constraints
-        return self.layer(torch.sigmoid(truth_values), 1.)
+        return self.layer(torch.sigmoid(truth_values))

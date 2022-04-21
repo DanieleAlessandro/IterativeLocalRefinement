@@ -4,32 +4,19 @@ import numpy as np
 import pickle
 import random
 import time
+from settings import *
 
 random.seed(0)
 torch.manual_seed(0)
 np.random.seed(0)
 
 # TODO:
-#  - NB: w diverso da lr perchè propagato nella bacward invece di essere moltiplicato sui nodi
-#  - w diviso da lr:
-#    - adesso entrambi hanno w
-#      - LTN si ferma quando supera w (l'alternativa e' aggiungere regolarizzazione per distanza da w... troppo complesso e non ha senso)
-#    - lr solo per LTN (qualche tentativo)
-
-# Fixed settings
-n_trials = 30  # TODO: 10 trials??
-n_steps = 100
-
-# Variable settings
-targets = [0.5, 0.75, 0.9, 1.0]  # 0.5,  list of target truth values
-
-lr_list = [0.1, 0.01]#, 0.001]
-regularization_lambda_list = [0.01, 0.0]  # [0.5, 0.1, 0.01, 0.0]
+#  - NB: w diverso da lr perchè propagato nella backward invece di essere moltiplicato sui nodi
 
 start_time = time.time()
 results_lrl = []
 results_ltn = []
-for filename in os.listdir('uf20-91')[:10]:  # TODO: rimuovere [:2]
+for filename in os.listdir('uf20-91'):
 
     with open(os.path.join('uf20-91', filename), 'r') as f:
         l = f.readlines()
@@ -40,76 +27,81 @@ for filename in os.listdir('uf20-91')[:10]:  # TODO: rimuovere [:2]
     f = create_formula(predicates, clauses)
     print(f)
 
-    for t in targets:
-        t_tensor = torch.Tensor([t])
-        print('Target: ' + str(t))
-        generator = initialize_pre_activations(n, n_trials)
+    # Generate initial random pre-activations
+    # The initialize_pre_activations first returns a not learnable tensor (used by LRL), from
+    # the second next it returns the same exact value as a new learnable parameter (used by LTN)
+    generator = initialize_pre_activations(n, n_trials)
+    z = next(generator)
+    initial_truth_values = torch.sigmoid(z)
 
-        # ========================================== LRL ==========================================
+    for method in methods:
+        for t in targets:
+            t_tensor = torch.Tensor([t])
+            print('Target: ' + str(t))
 
-        # Generate initial random pre-activations
-        z = next(generator)
-        initial_truth_values = torch.sigmoid(z)
+            # ========================================== LRL ==========================================
 
-        # Define the model
-        lrl = LRLModel(f, n_steps, t)
+            # Define the model
+            lrl = LRLModel(f, n_steps, t)
 
-        # Optimization
-        lrl_predictions = lrl(z)
+            # Optimization
+            lrl_predictions = lrl(z, method)
 
-        # Evaluation
-        lrl_sat_f, lrl_norm_f = evaluate_solutions(f, lrl_predictions, initial_truth_values)
-        lrl_sat_c, lrl_norm_c, lrl_n_clauses = evaluate_solutions(f, defuzzify_list(lrl_predictions), defuzzify(initial_truth_values), fuzzy=False)
+            # Evaluation
+            lrl_sat_f, lrl_norm_f = evaluate_solutions(f, lrl_predictions, initial_truth_values)
+            lrl_sat_c, lrl_norm_c, lrl_n_clauses = evaluate_solutions(f, defuzzify_list(lrl_predictions), defuzzify(initial_truth_values), fuzzy=False)
 
-        results_lrl.append({  #_f: fuzzy truth values used, _c: classic logic (defuzzified)
-            'formula': filename,
-            'target': t,
-            'sat_f': lrl_sat_f,
-            'sat_c': lrl_sat_c,
-            'norm_f': lrl_norm_f,
-            'norm_c': lrl_norm_c,
-            'n_clauses_satisfied_c':lrl_n_clauses
-        })
-        print('LRL: ' + str(torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()))
+            results_lrl.append({  #_f: fuzzy truth values used, _c: classic logic (defuzzified)
+                'formula': filename,
+                'target': t,
+                'method':method,
+                'sat_f': lrl_sat_f,
+                'sat_c': lrl_sat_c,
+                'norm_f': lrl_norm_f,
+                'norm_c': lrl_norm_c,
+                'n_clauses_satisfied_c':lrl_n_clauses
+            })
+            print('LRL: ' + str(torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()))
 
-        # ========================================== SGD ==========================================
-        for reg_lambda in regularization_lambda_list:
-            for lr in lr_list:
-                # Generate initial random pre-activations
-                z = next(generator)
+    # ========================================== SGD ==========================================
+    for reg_lambda in regularization_lambda_list:
+        for lr in lr_list:
+            print('Learning rate: ' + str(lr))
 
-                # Define the model
-                ltn = LTNModel(f)
+            # Generate initial random pre-activations
+            z = next(generator)
 
-                # LTN optimization
-                optimizer = torch.optim.SGD([z], lr=lr)  # TODO
+            # Define the model
+            ltn = LTNModel(f)
 
-                ltn_predictions = [torch.sigmoid(z)]
-                for i in range(n_steps):
-                    s = - torch.sum(torch.minimum(ltn(z), t_tensor)) + \
-                        reg_lambda * torch.linalg.vector_norm(torch.sigmoid(z) - initial_truth_values, ord=1)
-                    s.backward()
-                    optimizer.step()
-                    ltn_predictions.append(torch.sigmoid(z))
+            # LTN optimization
+            optimizer = torch.optim.SGD([z], lr=lr)  # TODO
 
-                # Evaluation
-                ltn_sat_f, ltn_norm_f = evaluate_solutions(f, ltn_predictions, initial_truth_values)
-                ltn_sat_c, ltn_norm_c, ltn_n_clauses = evaluate_solutions(f,
-                                                                          defuzzify_list(ltn_predictions),
-                                                                          defuzzify(initial_truth_values), fuzzy=False)
+            ltn_predictions = [torch.sigmoid(z)]
+            for i in range(n_steps):
+                s = - torch.sum(torch.minimum(ltn(z), t_tensor)) + \
+                    reg_lambda * torch.linalg.vector_norm(torch.sigmoid(z) - initial_truth_values, ord=1)
+                s.backward()
+                optimizer.step()
+                ltn_predictions.append(torch.sigmoid(z))
 
-                results_ltn.append({  # TODO: add count of clauses satisfied
-                    'formula': filename,
-                    'target': t,
-                    'lr': lr,
-                    'lambda': reg_lambda,
-                    'sat_f': ltn_sat_f,
-                    'sat_c': ltn_sat_c,
-                    'norm_f': ltn_norm_f,
-                    'norm_c': ltn_norm_c,
-                    'n_clauses_satisfied_c': ltn_n_clauses
-                })
-                print('LTN: ' + str(torch.mean(f.satisfaction(ltn_predictions[-1])).tolist()))
+            # Evaluation
+            ltn_sat_f, ltn_norm_f = evaluate_solutions(f, ltn_predictions, initial_truth_values)
+            ltn_sat_c, ltn_norm_c, ltn_n_clauses = evaluate_solutions(f,
+                                                                      defuzzify_list(ltn_predictions),
+                                                                      defuzzify(initial_truth_values), fuzzy=False)
+
+            results_ltn.append({
+                'formula': filename,
+                'lr': lr,
+                'lambda': reg_lambda,
+                'sat_f': ltn_sat_f,
+                'sat_c': ltn_sat_c,
+                'norm_f': ltn_norm_f,
+                'norm_c': ltn_norm_c,
+                'n_clauses_satisfied_c': ltn_n_clauses
+            })
+            print('LTN: ' + str(torch.mean(f.satisfaction(ltn_predictions[-1])).tolist()))
 
 print('Saving results...')
 end_time = time.time()
