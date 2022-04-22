@@ -6,17 +6,21 @@ import random
 import time
 from settings import *
 
-random.seed(0)
-torch.manual_seed(0)
-np.random.seed(0)
+seed = 0
+random.seed(seed)
+torch.manual_seed(seed)
+np.random.seed(seed)
 
 # TODO:
 #  - NB: w diverso da lr perchè propagato nella backward invece di essere moltiplicato sui nodi
 
+list_of_files = random.sample(os.listdir('uf20-91'), n_formulas)
+print(list_of_files)
+
 start_time = time.time()
 results_lrl = []
 results_ltn = []
-for filename in os.listdir('uf20-91'):
+for filename in list_of_files:
 
     with open(os.path.join('uf20-91', filename), 'r') as f:
         l = f.readlines()
@@ -30,7 +34,7 @@ for filename in os.listdir('uf20-91'):
     # Generate initial random pre-activations
     # The initialize_pre_activations first returns a not learnable tensor (used by LRL), from
     # the second next it returns the same exact value as a new learnable parameter (used by LTN)
-    generator = initialize_pre_activations(n, n_trials)
+    generator = initialize_pre_activations(n, n_initial_vectors)
     z = next(generator)
     initial_truth_values = torch.sigmoid(z)
 
@@ -116,9 +120,10 @@ with open('results_ltn', 'wb') as f:
 
 # TODO:
 #  - check all TODOs and debug
-#  - mean over all problems (also standard deviation??)
-#  - dump mean results
-#  - plots
+#  - standard deviation over all problems??
 #  DONE:
 #  - run it twice and check if the results are exactly the same (check the seed)
 #  - dump results_ltn and results_lrl
+#  - mean over all problems
+#  - dump mean results
+#  - plots
