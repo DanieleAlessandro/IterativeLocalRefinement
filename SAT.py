@@ -20,7 +20,9 @@ print(list_of_files)
 start_time = time.time()
 results_lrl = []
 results_ltn = []
-for filename in list_of_files:
+for problem_number, filename in enumerate(list_of_files):
+    problem_number += 1
+    print('Problem n. ' + str(problem_number) + '/' + str(n_formulas))
 
     with open(os.path.join('uf20-91', filename), 'r') as f:
         l = f.readlines()
@@ -29,7 +31,6 @@ for filename in list_of_files:
     clauses, n = parse_cnf(l)
     predicates = create_predicates(n)
     f = create_formula(predicates, clauses)
-    print(f)
 
     for t in targets:
         t_tensor = torch.Tensor([t])
