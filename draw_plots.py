@@ -19,8 +19,8 @@ def generate_plots(key, label, y_label, file_name):
 
     x_axis = list(range(n_steps + 1))
 
-    for method in methods:
-        for t in targets:
+    for t in targets:
+        for method in methods:
             fuzzy_sat_lrl = np.mean(np.array([p[key]
                                               for p in results_lrl
                                               if p['target'] == t and p['method'] == method]), axis=0)
@@ -29,20 +29,18 @@ def generate_plots(key, label, y_label, file_name):
                 to_fill = n_steps + 1 - len(fuzzy_sat_lrl)
                 fuzzy_sat_lrl = np.concatenate([fuzzy_sat_lrl, np.array([fuzzy_sat_lrl[-1]] * to_fill)])
 
-            plt.plot(x_axis, fuzzy_sat_lrl, label='LRL w=' + str(t) + ', agg=' + method)
+            plt.plot(x_axis, fuzzy_sat_lrl, label='LRL agg=' + method)
 
-    for reg_l in regularization_lambda_list:
-        for lr in lr_list:
+        for reg_l in regularization_lambda_list:
             fuzzy_sat_ltn = np.mean(np.array([p[key]
                                               for p in results_ltn
-                                              if p['lr'] == lr and p['lambda'] == reg_l]), axis=0)
+                                              if p['target'] == t and p['lambda'] == reg_l]), axis=0)
 
-            plt.plot(x_axis, fuzzy_sat_ltn, ls='--', label='SGD lr=' + str(lr) + ' reg=' + str(reg_l))
+            plt.plot(x_axis, fuzzy_sat_ltn, ls='--', label='SGD reg=' + str(reg_l))
 
-    plt.legend(bbox_to_anchor=(1.45, 0.9), loc='upper right')
-
-    plt.savefig('plots/' + file_name + '.png', bbox_inches="tight")
-    plt.close()
+        plt.legend(bbox_to_anchor=(1.45, 0.9), loc='upper right')
+        plt.savefig('plots/' + 'w_' + str(t) + '/'+ file_name + '.png', bbox_inches="tight")
+        plt.close()
 
 
 generate_plots('sat_f', 'Fuzzy satisfaction over time', 'fuzzy sat', 'sat_f')

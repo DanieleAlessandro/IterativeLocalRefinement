@@ -31,16 +31,17 @@ for filename in list_of_files:
     f = create_formula(predicates, clauses)
     print(f)
 
-    # Generate initial random pre-activations
-    # The initialize_pre_activations first returns a not learnable tensor (used by LRL), from
-    # the second next it returns the same exact value as a new learnable parameter (used by LTN)
-    generator = initialize_pre_activations(n, n_initial_vectors)
-    z = next(generator)
-    initial_truth_values = torch.sigmoid(z)
+    for t in targets:
+        t_tensor = torch.Tensor([t])
 
-    for method in methods:
-        for t in targets:
-            t_tensor = torch.Tensor([t])
+        # Generate initial random pre-activations
+        # The initialize_pre_activations first returns a not learnable tensor (used by LRL), from
+        # the second next it returns the same exact value as a new learnable parameter (used by LTN)
+        generator = initialize_pre_activations(n, n_initial_vectors)
+        z = next(generator)
+        initial_truth_values = torch.sigmoid(z)
+
+        for method in methods:
             print('Target: ' + str(t))
 
             # ========================================== LRL ==========================================
@@ -58,19 +59,18 @@ for filename in list_of_files:
             results_lrl.append({  #_f: fuzzy truth values used, _c: classic logic (defuzzified)
                 'formula': filename,
                 'target': t,
-                'method':method,
+                'method': method,
                 'sat_f': lrl_sat_f,
                 'sat_c': lrl_sat_c,
                 'norm_f': lrl_norm_f,
                 'norm_c': lrl_norm_c,
-                'n_clauses_satisfied_c':lrl_n_clauses
+                'n_clauses_satisfied_c': lrl_n_clauses
             })
             print('LRL: ' + str(torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()))
 
-    # ========================================== SGD ==========================================
-    for reg_lambda in regularization_lambda_list:
-        for lr in lr_list:
-            print('Learning rate: ' + str(lr))
+        # ========================================== SGD ==========================================
+        for reg_lambda in regularization_lambda_list:
+            print('Target: ' + str(t))
 
             # Generate initial random pre-activations
             z = next(generator)
@@ -79,11 +79,11 @@ for filename in list_of_files:
             ltn = LTNModel(f)
 
             # LTN optimization
-            optimizer = torch.optim.SGD([z], lr=lr)  # TODO
+            optimizer = torch.optim.SGD([z], lr=0.1)
 
             ltn_predictions = [torch.sigmoid(z)]
             for i in range(n_steps):
-                s = - torch.sum(torch.minimum(ltn(z), t_tensor)) + \
+                s = torch.linalg.vector_norm(ltn(z) - t_tensor, ord=2) + \
                     reg_lambda * torch.linalg.vector_norm(torch.sigmoid(z) - initial_truth_values, ord=1)
                 s.backward()
                 optimizer.step()
@@ -97,7 +97,7 @@ for filename in list_of_files:
 
             results_ltn.append({
                 'formula': filename,
-                'lr': lr,
+                'target': t,
                 'lambda': reg_lambda,
                 'sat_f': ltn_sat_f,
                 'sat_c': ltn_sat_c,
