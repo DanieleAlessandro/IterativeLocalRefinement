@@ -1,7 +1,7 @@
 # Fixed settings
 n_initial_vectors = 10
 n_steps = 100
-n_formulas = 10
+n_formulas = 100
 
 # Hyper parameters
 targets = [0.3, 0.5, 0.8, 1.0]  # list of target truth values for both LRL and LTN
