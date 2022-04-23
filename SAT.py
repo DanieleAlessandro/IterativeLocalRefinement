@@ -33,7 +33,6 @@ for problem_number, filename in enumerate(list_of_files):
     f = SATFormula(clauses)
 
     for t in targets:
-        start = time.time()
         t_tensor = torch.Tensor([t])
 
         # Generate initial random pre-activations
@@ -44,6 +43,7 @@ for problem_number, filename in enumerate(list_of_files):
         initial_truth_values = torch.sigmoid(z)
 
         for method in methods:
+            start = time.time()
             print('Target: ' + str(t))
 
             # ========================================== LRL ==========================================
@@ -69,9 +69,13 @@ for problem_number, filename in enumerate(list_of_files):
                 'n_clauses_satisfied_c': lrl_n_clauses
             })
             print('LRL: ' + str(torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()))
+            end = time.time()
+            print('Time: ' + str((end - start) / 6))
+
 
         # ========================================== SGD ==========================================
         for reg_lambda in regularization_lambda_list:
+            start = time.time()
             print('Target: ' + str(t))
 
             # Generate initial random pre-activations
@@ -108,8 +112,9 @@ for problem_number, filename in enumerate(list_of_files):
                 'n_clauses_satisfied_c': ltn_n_clauses
             })
             print('LTN: ' + str(torch.mean(f.satisfaction(ltn_predictions[-1])).tolist()))
-        end = time.time()
-        print('Time: ' + str((end - start)/6))
+            end = time.time()
+            print('Time: ' + str((end - start) / 6))
+
 
 print('Saving results...', flush=True)
 end_time = time.time()
