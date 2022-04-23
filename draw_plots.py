@@ -21,15 +21,16 @@ def generate_plots(key, label, y_label, file_name):
 
     for t in targets:
         for method in methods:
-            fuzzy_sat_lrl = np.mean(np.array([p[key]
-                                              for p in results_lrl
-                                              if p['target'] == t and p['method'] == method]), axis=0)
-
-            if len(fuzzy_sat_lrl) < n_steps + 1:
-                to_fill = n_steps + 1 - len(fuzzy_sat_lrl)
-                fuzzy_sat_lrl = np.concatenate([fuzzy_sat_lrl, np.array([fuzzy_sat_lrl[-1]] * to_fill)])
-
-            plt.plot(x_axis, fuzzy_sat_lrl, label='LRL agg=' + method)
+            l_results = []
+            for p in results_lrl:
+                if p['target'] == t and p['method'] == method:
+                    # There used to be a mean here??
+                    fuzzy_sat_lrl = p[key]
+                    if len(fuzzy_sat_lrl) < n_steps + 1:
+                        to_fill = n_steps + 1 - len(fuzzy_sat_lrl)
+                        fuzzy_sat_lrl = np.concatenate([fuzzy_sat_lrl, np.array([fuzzy_sat_lrl[-1]] * to_fill)])
+                    l_results.append(fuzzy_sat_lrl)
+            plt.plot(x_axis, np.stack(l_results).mean(0), label='LRL agg=' + method)
 
         for reg_l in regularization_lambda_list:
             fuzzy_sat_ltn = np.mean(np.array([p[key]
