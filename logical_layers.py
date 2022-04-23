@@ -1,6 +1,5 @@
 import torch
 
-
 class LRL(torch.nn.Module):
     def __init__(self, formula):
         super().__init__()
