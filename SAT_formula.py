@@ -8,6 +8,7 @@ class SATFormula(Formula):
         self.clause_t = None
         formula_tensor = torch.tensor(clauses)
         self.prop_index = formula_tensor.abs() - 1
+        # self.prop_index = formula_tensor.abs()
         self.sign = formula_tensor.sign()
 
     def function(self, truth_values):
@@ -34,8 +35,15 @@ class SATFormula(Formula):
         # Find what propositions the results belong to
         propositions_max_indices = torch.take_along_dim(self.prop_index.unsqueeze(0), max_indices, -1).squeeze()
         # Uses the mean to combine the deltas on the same proposition
-        self.prop_deltas = torch.scatter_reduce(delta_max, -1, propositions_max_indices, "mean")
+        # How to compute the mean on nonzero values: Take the sum (scatter_add), then count amount of nonzero values
+        self.prop_deltas = torch.scatter_reduce(delta_max, -1, propositions_max_indices, 'sum')
 
+        # print(delta_max != 0)
+        amt_nonzero = torch.scatter_reduce((delta_max != 0).float(), -1, propositions_max_indices, 'sum')
+        mask = amt_nonzero > 0
+        self.prop_deltas[mask] = self.prop_deltas[mask] / amt_nonzero[mask]
+
+        # TODO: Max heuristic can be implemented with a max and a min scatter reduce, then finding pointwise absolute largest value
         # print(self.prop_deltas, self.prop_deltas.shape)
 
         return delta_max

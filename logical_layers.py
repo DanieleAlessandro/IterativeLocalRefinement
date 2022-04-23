@@ -15,7 +15,7 @@ class LRL(torch.nn.Module):
             return None
 
         # TODO: What about this weird parameter here? It seems to really smooth out the trajectory
-        delta_sat = torch.where(target - satisfaction > 0, (target - satisfaction).double(), 0.).float() / 1.
+        delta_sat = torch.where(target - satisfaction > 0, (target - satisfaction).double(), 0.).float() / 10.
 
         self.formula.backward(delta_sat)
         delta_tensor = self.formula.get_delta_tensor(truth_values, method)

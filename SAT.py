@@ -32,6 +32,8 @@ for problem_number, filename in enumerate(list_of_files):
 
     f = SATFormula(clauses)
 
+    # predicates = create_predicates(n)
+    # f_non_parallel = create_formula(predicates, clauses)
     for t in targets:
         t_tensor = torch.Tensor([t])
 
@@ -53,6 +55,10 @@ for problem_number, filename in enumerate(list_of_files):
 
             # Optimization
             lrl_predictions = lrl(z, method)
+
+            # For debugging purposes
+            # lrl = LRLModel(f_non_parallel, n_steps, t)
+            # lrl(z, method)
 
             # Evaluation
             lrl_sat_f, lrl_norm_f = evaluate_solutions(f, lrl_predictions, initial_truth_values)
