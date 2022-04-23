@@ -1,3 +1,4 @@
+from SAT_formula import SATFormula
 from utils import *
 import os
 import numpy as np
@@ -28,8 +29,8 @@ for problem_number, filename in enumerate(list_of_files):
 
     # Read knowledge
     clauses, n = parse_cnf(l)
-    predicates = create_predicates(n)
-    f = create_formula(predicates, clauses)
+
+    f = SATFormula(clauses)
 
     for t in targets:
         start = time.time()

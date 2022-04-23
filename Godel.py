@@ -11,6 +11,7 @@ class AND(Formula):
 
     def boost_function(self, truth_values, delta):
         l = self.forward_output + delta
+        # Can probably be done in a more efficient way: (truth_values <= l) * (l - truth_values)
         return ((truth_values <= l) * l + (truth_values > l) * truth_values) - truth_values
 
     def get_name(self, parenthesis=False):

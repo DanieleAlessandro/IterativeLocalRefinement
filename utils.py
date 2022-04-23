@@ -19,7 +19,7 @@ def parse_cnf(in_data):
                     if lit == 0:
                         cnf.append(list())
                     else:
-                        lit = lit - 1 if lit > 0 else lit + 1
+                        # lit = lit - 1 if lit > 0 else lit + 1
                         cnf[-1].append(lit)
             elif tokens[0] == 'p':
                 number_of_variables = int(tokens[2])
