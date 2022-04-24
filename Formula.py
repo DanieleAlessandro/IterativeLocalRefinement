@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import torch
 from prettytable import PrettyTable
 import random
@@ -27,6 +29,7 @@ class Formula:
         header.append(self.get_name())
 
         pt = PrettyTable(header)
+        # TODO: Does not give any inputs
         results = self.forward()
         pt.add_rows(torch.concat([self.input_tensor, results], 1).numpy())
         print(pt)
@@ -97,7 +100,7 @@ class Predicate(Formula):
     def reset_deltas(self):
         self.deltas = []
 
-    def aggregate_deltas(self, method):
+    def aggregate_deltas(self, method='mean') -> Tuple[int, torch.Tensor]:
         if method == 'most_clauses':
             deltas = torch.concat(self.deltas, 1)
             positive = torch.sum(deltas > 0., 1, keepdim=True) - torch.sum(deltas <= 0., 1, keepdim=True) >= 0
@@ -108,7 +111,8 @@ class Predicate(Formula):
         if method == 'mean':
             deltas = torch.concat(self.deltas, 1)
 
-            return self.index, torch.nan_to_num(torch.sum(deltas, 1, keepdim=True) / torch.sum(deltas != 0.0, 1, keepdim=True))
+            return self.index, torch.nan_to_num(
+                torch.sum(deltas, 1, keepdim=True) / torch.sum(deltas != 0.0, 1, keepdim=True))
         if method == 'max':
             deltas = torch.concat(self.deltas, 1)
             abs_deltas = deltas.abs()
@@ -139,7 +143,6 @@ class Predicate(Formula):
                 i = torch.argmax(abs_deltas, 1, keepdim=True)
 
                 return self.index, torch.gather(deltas, 1, i)
-
 
     def get_name(self, parenthesis=False):
         return self.name

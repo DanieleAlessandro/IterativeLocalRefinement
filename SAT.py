@@ -17,12 +17,11 @@ np.random.seed(seed)
 list_of_files = random.sample(os.listdir('uf20-91'), n_formulas)
 print(list_of_files)
 
-start_time = time.time()
 results_lrl = []
 results_ltn = []
 for problem_number, filename in enumerate(list_of_files):
     problem_number += 1
-    print('Problem n. ' + str(problem_number) + '/' + str(n_formulas))
+    print('Problem n. ' + str(problem_number) + '/' + str(n_formulas), flush=True)
 
     with open(os.path.join('uf20-91', filename), 'r') as f:
         l = f.readlines()
@@ -33,6 +32,7 @@ for problem_number, filename in enumerate(list_of_files):
     f = create_formula(predicates, clauses)
 
     for t in targets:
+        start = time.time()
         t_tensor = torch.Tensor([t])
 
         # Generate initial random pre-activations
@@ -107,11 +107,13 @@ for problem_number, filename in enumerate(list_of_files):
                 'n_clauses_satisfied_c': ltn_n_clauses
             })
             print('LTN: ' + str(torch.mean(f.satisfaction(ltn_predictions[-1])).tolist()))
+        end = time.time()
+        print('Time: ' + str((end - start)/6))
 
-print('Saving results...')
+print('Saving results...', flush=True)
 end_time = time.time()
 
-print('Time: ' + str(end_time - start_time) + 's')
+# print('Time: ' + str(end_time - start_time) + 's')
 
 with open('results_lrl', 'wb') as f:
     pickle.dump(results_lrl, f)
