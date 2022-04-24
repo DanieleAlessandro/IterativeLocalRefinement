@@ -7,3 +7,6 @@ n_formulas = 100
 targets = [0.3, 0.5, 0.8, 1.0]  # list of target truth values for both LRL and LTN
 methods = ['max', 'mean']  # list of aggregation methods for LRL
 regularization_lambda_list = [1.0, 0.1, 0.01, 0.0]  # regularization hyperparameter for LTN
+
+# Settings for plots
+grid = False
