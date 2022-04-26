@@ -63,7 +63,7 @@ class SATLukasiewicz(SATTNorm):
         # Compute the t-norm boost function
         w = (self.formula_t + delta).unsqueeze(1)
         n = self.clause_t.shape[-1]
-        sorted_clauses = torch.sort(self.clause_t, dim=-1, descending=True)
+        sorted_clauses = torch.sort(self.clause_t, dim=-1, descending=False)
 
         # Find the delta_M for each M
         M = torch.arange(1, n+1)
