@@ -7,27 +7,33 @@ from Formula import Formula
 
 class SATTNorm(ABC):
 
+    clause_t: torch.Tensor
+
     @abstractmethod
-    def forward(self, indexed_t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, indexed_t: torch.Tensor) -> torch.Tensor:
         pass
 
     @abstractmethod
     def boost_function(self, delta: torch.Tensor, prop_index: torch.Tensor, sign: torch.Tensor) -> torch.Tensor:
         pass
 
+    def sgd_function(self, indexed_t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        t = self.forward(indexed_t)[0]
+        return t, t
 
 class SATGodel(SATTNorm):
 
-    def forward(self, indexed_t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        self.clause_t = torch.max(indexed_t, dim=2)
-        self.formula_t = torch.min(self.clause_t[0], dim=1)[0]
-        return self.formula_t, self.clause_t[0]
+    def forward(self, indexed_t: torch.Tensor) -> torch.Tensor:
+        self.clause_t_g = torch.max(indexed_t, dim=2)
+        self.clause_t = self.clause_t_g[0]
+        self.formula_t = torch.min(self.clause_t, dim=1)[0]
+        return self.formula_t
 
     def boost_function(self, delta, prop_index, sign) -> torch.Tensor:
         lambda_min = (self.formula_t + delta).unsqueeze(1)
         # t-norm TBF
-        delta_min = (self.clause_t[0] <= lambda_min) * (lambda_min - self.clause_t[0])
-        max_indices = self.clause_t[1].unsqueeze(-1)
+        delta_min = (self.clause_t <= lambda_min) * (lambda_min - self.clause_t)
+        max_indices = self.clause_t_g[1].unsqueeze(-1)
 
         # The delta applied on the max truth values on each clause
         # Find max inputs for t-conorm TBF. Multiply with sign to deal with negated literals
@@ -46,12 +52,12 @@ class SATGodel(SATTNorm):
 
 class SATLukasiewicz(SATTNorm):
 
-    def forward(self, indexed_t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, indexed_t: torch.Tensor) -> torch.Tensor:
         self.indexed_t = indexed_t
         self.clause_t = torch.clip(torch.sum(indexed_t, dim=-1), 0, 1)
         n = self.clause_t.shape[-1]
         self.formula_t = torch.clip(torch.sum(self.clause_t, dim=-1) - (n-1), 0, 1)
-        return self.formula_t, self.clause_t
+        return self.formula_t
 
     def boost_function(self, delta, prop_index, sign) -> torch.Tensor:
         # Compute the t-norm boost function
@@ -89,25 +95,29 @@ class SATLukasiewicz(SATTNorm):
 
         return prop_deltas
 
+    def sgd_function(self, indexed_t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        self.clause_t = torch.clip(torch.sum(indexed_t, dim=-1), 0, 1)
+        n = self.clause_t.shape[-1]
+        s = torch.sum(self.clause_t, dim=-1) - (n - 1)
+        formula_t = torch.clip(s, 0, 1)
+        return s, formula_t
+
+
 
 class SATFormula(Formula):
-    def __init__(self, clauses, tnorm=SATGodel()):
+    def __init__(self, clauses, is_sgd=False, tnorm=SATGodel()):
         self.clause_t = None
+        self.is_sgd = is_sgd
         formula_tensor = torch.tensor(clauses)
         self.prop_index = formula_tensor.abs() - 1
         # self.prop_index = formula_tensor.abs()
         self.sign = formula_tensor.sign()
         self.tnorm = tnorm
 
-    def function(self, truth_values) -> torch.Tensor:
-        indexed_t = truth_values[..., self.prop_index]
-        indexed_t[..., self.sign < 0] = 1 - indexed_t[..., self.sign < 0]
-
+    def function(self, indexed_t) -> torch.Tensor:
         self.input_tensor = indexed_t
 
-        # TODO: Implement also for other t-norms
-
-        self.formula_t, self.clause_t = self.tnorm.forward(indexed_t)
+        self.formula_t = self.tnorm.forward(indexed_t)
         return self.formula_t
 
     def boost_function(self, truth_values, delta) -> torch.Tensor:
@@ -117,13 +127,14 @@ class SATFormula(Formula):
         pass
 
     def __str__(self):
-        s = self.get_name() + '\n'
-        # s += str(self.input_tensor)
-
-        return s
+        return self.get_name() + '\n'
 
     def forward(self, truth_values):
-        return self.function(truth_values)
+        indexed_t = truth_values[..., self.prop_index]
+        indexed_t[..., self.sign < 0] = 1 - indexed_t[..., self.sign < 0]
+        if self.is_sgd:
+            return self.tnorm.sgd_function(indexed_t)
+        return self.function(indexed_t)
 
     def backward(self, delta, randomized=False):
         self.prop_deltas = self.boost_function(self.input_tensor, delta)
@@ -142,11 +153,12 @@ class SATFormula(Formula):
     def satisfaction(self, truth_values):
         s = self.forward(truth_values)
         self.reset_deltas()
-
+        if self.is_sgd:
+            return s[1]
         return s
 
     def sat_sub_formulas(self, truth_values):
-        return self.clause_t
+        return self.tnorm.clause_t
 
 #
 # class Predicate(Formula):

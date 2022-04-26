@@ -30,7 +30,6 @@ for problem_number, filename in enumerate(list_of_files):
     # Read knowledge
     clauses, n = parse_cnf(l)
 
-    f = SATFormula(clauses, SATLukasiewicz())
 
     # predicates = create_predicates(n)
     # f_non_parallel = create_formula(predicates, clauses)
@@ -44,6 +43,8 @@ for problem_number, filename in enumerate(list_of_files):
         generator = initialize_pre_activations(n, n_initial_vectors)
         z = next(generator)
         initial_truth_values = torch.sigmoid(z)
+
+        f = SATFormula(clauses, False, SATLukasiewicz())
 
         for method in methods:
             for lrl_schedule in lrl_schedules:
@@ -79,6 +80,7 @@ for problem_number, filename in enumerate(list_of_files):
                 end = time.time()
                 print(f'LRL@{lrl_schedule}: {torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()}     Time: {(end - start)}')
 
+        f = SATFormula(clauses, True, SATLukasiewicz())
 
         # ========================================== SGD ==========================================
         for reg_lambda in regularization_lambda_list:
@@ -95,7 +97,8 @@ for problem_number, filename in enumerate(list_of_files):
 
             ltn_predictions = [torch.sigmoid(z)]
             for i in range(n_steps):
-                s = torch.linalg.vector_norm(ltn(z) - t_tensor, ord=2) + \
+                sgd_value, _ = ltn(z)
+                s = torch.linalg.vector_norm(sgd_value - t_tensor, ord=2) + \
                     reg_lambda * torch.linalg.vector_norm(torch.sigmoid(z) - initial_truth_values, ord=1)
                 s.backward()
                 optimizer.step()
