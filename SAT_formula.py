@@ -82,7 +82,7 @@ class SATLukasiewicz(SATTNorm):
         delta_clauses = torch.scatter_reduce(delta_sorted_clauses, -1, sorted_clauses[1], 'sum')
 
         # Compute the t-conorm boost function
-        clauses_w = torch.clip(self.clause_t + delta_clauses, 0, 1)
+        clauses_w = self.clause_t + delta_clauses
         delta_literals = (torch.clip(clauses_w - torch.sum(self.indexed_t, dim=-1), 0, 1) / 3.0).unsqueeze(-1) * sign
 
         # Distribute the deltas over the propositions using the mean aggregation
@@ -102,7 +102,68 @@ class SATLukasiewicz(SATTNorm):
         formula_t = torch.clip(s, 0, 1)
         return s, formula_t
 
+class SATProduct(SATTNorm):
+    """
+    We could technically reuse this for other norms with p=1
+    """
+    def forward(self, indexed_t: torch.Tensor) -> torch.Tensor:
+        self.indexed_t = indexed_t
+        if torch.isnan(self.indexed_t).any():
+            print("NaN in indexed_t")
+        self.clause_t = 1 - torch.prod(1-indexed_t, dim=-1)
+        self.formula_t = torch.prod(self.clause_t, dim=-1)
+        if torch.isnan(self.formula_t).any():
+            print("NaN in formula_t")
+        return self.formula_t
 
+    def boost_function(self, delta, prop_index, sign) -> torch.Tensor:
+        # Compute the t-norm boost function
+        w = (self.formula_t + delta).unsqueeze(1)
+        sorted_clauses = torch.sort(self.clause_t, dim=-1, descending=True)
+        n = self.clause_t.shape[-1]
+        onez = torch.ones(self.clause_t.shape[0], 1)
+
+        # Compute the truth value lambda for each clause
+        lamd = torch.pow(
+            w / torch.cat([onez, torch.cumprod(sorted_clauses[0], dim=-1)], dim=-1),
+            1 / (n - torch.arange(0, n+1).unsqueeze(0)))
+        # Choose the right value lambda depending on what values exceed it
+        cond = lamd < torch.cat([onez, sorted_clauses[0]], dim=-1)
+        i_lambda = torch.argmax(cond.float() - torch.roll(cond.float(), -1, -1), dim=-1)
+
+        # This should never happen...
+        # i_lambda[cond.all(dim=-1)] = n - 1
+
+        chosen_lambdas = torch.gather(lamd, -1, i_lambda.unsqueeze(-1))
+        # We choose cond[..., 1:] because the first value is always 1
+        delta_sorted_clauses = torch.where(cond[..., 1:], torch.tensor(0.0), chosen_lambdas - sorted_clauses[0])
+        delta_clauses = torch.scatter_reduce(delta_sorted_clauses, -1, sorted_clauses[1], 'sum')
+
+        # Compute the t-conorm boost function
+        clauses_w = self.clause_t + delta_clauses
+        # Note: This code is equal to that of the Godel!
+        max_literals = self.indexed_t.max(dim=-1)
+        max_indices = max_literals[1].unsqueeze(-1)
+        # Computes the delta for the t-conorm boost function
+        # We multiply here with 1 - max_literals so that it is excluded from the division
+        # TODO: What if the divisor approaches 0 if the clause is almost satisfied?
+        delta_divisor = (1 - max_literals[0]) * (1-clauses_w) / (torch.prod(1 - self.indexed_t, dim=-1) + 1e-10)
+        delta_max_literal = (1 - max_literals[0] - delta_divisor
+                             ) * torch.take_along_dim(sign.unsqueeze(0), max_indices, -1).squeeze()
+
+        if torch.isnan(delta_max_literal).any():
+            print("NaN in delta_max_literal")
+        # Find what propositions the results belong to
+        propositions_max_indices = torch.take_along_dim(prop_index.unsqueeze(0), max_indices, -1).squeeze()
+        # Uses the mean to combine the deltas on the same proposition
+        # How to compute the mean on nonzero values: Take the sum (scatter_add), then count amount of nonzero values
+        prop_deltas = torch.scatter_reduce(delta_max_literal, -1, propositions_max_indices, 'sum')
+
+        # Check what values are nonzero (or not almost zero)
+        amt_nonzero = torch.scatter_reduce((torch.abs(delta_max_literal) > 0.0000001).float(), -1, propositions_max_indices, 'sum')
+        mask = amt_nonzero > 0
+        prop_deltas[mask] = prop_deltas[mask] / amt_nonzero[mask]
+        return prop_deltas
 
 class SATFormula(Formula):
     def __init__(self, clauses, is_sgd=False, tnorm=SATGodel()):

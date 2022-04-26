@@ -1,4 +1,4 @@
-from SAT_formula import SATFormula, SATLukasiewicz
+from SAT_formula import SATFormula, SATLukasiewicz, SATProduct
 from utils import *
 import os
 import numpy as np
@@ -20,6 +20,8 @@ print(list_of_files)
 
 results_lrl = []
 results_ltn = []
+
+tnorm = SATProduct()
 for problem_number, filename in enumerate(list_of_files):
     problem_number += 1
     print('Problem n. ' + str(problem_number) + '/' + str(n_formulas), flush=True)
@@ -44,7 +46,7 @@ for problem_number, filename in enumerate(list_of_files):
         z = next(generator)
         initial_truth_values = torch.sigmoid(z)
 
-        f = SATFormula(clauses, False, SATLukasiewicz())
+        f = SATFormula(clauses, False, tnorm)
 
         for method in methods:
             for lrl_schedule in lrl_schedules:
@@ -80,7 +82,7 @@ for problem_number, filename in enumerate(list_of_files):
                 end = time.time()
                 print(f'LRL@{lrl_schedule}: {torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()}     Time: {(end - start)}')
 
-        f = SATFormula(clauses, True, SATLukasiewicz())
+        f = SATFormula(clauses, True, tnorm)
 
         # ========================================== SGD ==========================================
         for reg_lambda in regularization_lambda_list:
