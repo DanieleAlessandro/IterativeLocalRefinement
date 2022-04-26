@@ -1,4 +1,4 @@
-from SAT_formula import SATFormula
+from SAT_formula import SATFormula, SATLukasiewicz
 from utils import *
 import os
 import numpy as np
@@ -30,11 +30,12 @@ for problem_number, filename in enumerate(list_of_files):
     # Read knowledge
     clauses, n = parse_cnf(l)
 
-    f = SATFormula(clauses)
+    f = SATFormula(clauses, SATLukasiewicz())
 
     # predicates = create_predicates(n)
     # f_non_parallel = create_formula(predicates, clauses)
     for t in targets:
+        print('Target: ' + str(t))
         t_tensor = torch.Tensor([t])
 
         # Generate initial random pre-activations
@@ -45,44 +46,43 @@ for problem_number, filename in enumerate(list_of_files):
         initial_truth_values = torch.sigmoid(z)
 
         for method in methods:
-            start = time.time()
-            print('Target: ' + str(t))
+            for lrl_schedule in lrl_schedules:
+                start = time.time()
 
-            # ========================================== LRL ==========================================
+                # ========================================== LRL ==========================================
 
-            # Define the model
-            lrl = LRLModel(f, n_steps, t)
+                # Define the model
+                lrl = LRLModel(f, n_steps, t, lrl_schedule)
 
-            # Optimization
-            lrl_predictions = lrl(z, method)
+                # Optimization
+                lrl_predictions = lrl(z, method)
 
-            # For debugging purposes
-            # lrl = LRLModel(f_non_parallel, n_steps, t)
-            # lrl(z, method)
+                # For debugging purposes
+                # lrl = LRLModel(f_non_parallel, n_steps, t)
+                # lrl(z, method)
 
-            # Evaluation
-            lrl_sat_f, lrl_norm_f = evaluate_solutions(f, lrl_predictions, initial_truth_values)
-            lrl_sat_c, lrl_norm_c, lrl_n_clauses = evaluate_solutions(f, defuzzify_list(lrl_predictions), defuzzify(initial_truth_values), fuzzy=False)
+                # Evaluation
+                lrl_sat_f, lrl_norm_f = evaluate_solutions(f, lrl_predictions, initial_truth_values)
+                lrl_sat_c, lrl_norm_c, lrl_n_clauses = evaluate_solutions(f, defuzzify_list(lrl_predictions), defuzzify(initial_truth_values), fuzzy=False)
 
-            results_lrl.append({  #_f: fuzzy truth values used, _c: classic logic (defuzzified)
-                'formula': filename,
-                'target': t,
-                'method': method,
-                'sat_f': lrl_sat_f,
-                'sat_c': lrl_sat_c,
-                'norm_f': lrl_norm_f,
-                'norm_c': lrl_norm_c,
-                'n_clauses_satisfied_c': lrl_n_clauses
-            })
-            print('LRL: ' + str(torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()))
-            end = time.time()
-            print('Time: ' + str((end - start) / 6))
+                results_lrl.append({  #_f: fuzzy truth values used, _c: classic logic (defuzzified)
+                    'formula': filename,
+                    'target': t,
+                    'method': method,
+                    'schedule': lrl_schedule,
+                    'sat_f': lrl_sat_f,
+                    'sat_c': lrl_sat_c,
+                    'norm_f': lrl_norm_f,
+                    'norm_c': lrl_norm_c,
+                    'n_clauses_satisfied_c': lrl_n_clauses
+                })
+                end = time.time()
+                print(f'LRL@{lrl_schedule}: {torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()}     Time: {(end - start)}')
 
 
         # ========================================== SGD ==========================================
         for reg_lambda in regularization_lambda_list:
             start = time.time()
-            print('Target: ' + str(t))
 
             # Generate initial random pre-activations
             z = next(generator)
@@ -117,9 +117,8 @@ for problem_number, filename in enumerate(list_of_files):
                 'norm_c': ltn_norm_c,
                 'n_clauses_satisfied_c': ltn_n_clauses
             })
-            print('LTN: ' + str(torch.mean(f.satisfaction(ltn_predictions[-1])).tolist()))
             end = time.time()
-            print('Time: ' + str((end - start) / 6))
+            print(f'LTN@{reg_lambda}: {torch.mean(f.satisfaction(ltn_predictions[-1])).tolist()}     Time: {(end - start)}')
 
 
 print('Saving results...', flush=True)

@@ -37,7 +37,8 @@ def initialize_pre_activations(number_of_variables, number_of_trials):
     :param number_of_variables: number of propositions
     :param number_of_trials: number of different initial truth values
     """
-    z = (torch.rand([number_of_trials, number_of_variables]) - 0.5) * 10
+    t = torch.rand([number_of_trials, number_of_variables])
+    z = torch.logit(t)
 
     yield z
     while True:
@@ -105,13 +106,13 @@ def evaluate_solutions(formula, predictions_list, initial_predictions, fuzzy=Tru
 
 
 class LRLModel(torch.nn.Module):
-    def __init__(self, formula, n_layers, w):
+    def __init__(self, formula, n_layers, w, schedule=1.0):
         super().__init__()
         self.formula = formula
         self.layers = []
         self.w = w
         for _ in range(n_layers):
-            self.layers.append(LRL(formula))
+            self.layers.append(LRL(formula, schedule))
 
     def forward(self, pre_activations, method):
         predictions = [torch.sigmoid(pre_activations)]

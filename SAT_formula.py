@@ -1,28 +1,29 @@
+from typing import Tuple
+
 import torch
+from abc import ABC, abstractmethod
 
 from Formula import Formula
 
+class SATTNorm(ABC):
 
-class SATFormula(Formula):
-    def __init__(self, clauses):
-        self.clause_t = None
-        formula_tensor = torch.tensor(clauses)
-        self.prop_index = formula_tensor.abs() - 1
-        # self.prop_index = formula_tensor.abs()
-        self.sign = formula_tensor.sign()
+    @abstractmethod
+    def forward(self, indexed_t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        pass
 
-    def function(self, truth_values):
-        indexed_t = truth_values[..., self.prop_index]
-        indexed_t[..., self.sign < 0] = 1 - indexed_t[..., self.sign < 0]
+    @abstractmethod
+    def boost_function(self, delta: torch.Tensor, prop_index: torch.Tensor, sign: torch.Tensor) -> torch.Tensor:
+        pass
 
-        self.input_tensor = indexed_t
 
-        # TODO: Implement also for other t-norms
+class SATGodel(SATTNorm):
+
+    def forward(self, indexed_t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         self.clause_t = torch.max(indexed_t, dim=2)
         self.formula_t = torch.min(self.clause_t[0], dim=1)[0]
-        return self.formula_t
+        return self.formula_t, self.clause_t[0]
 
-    def boost_function(self, truth_values, delta):
+    def boost_function(self, delta, prop_index, sign) -> torch.Tensor:
         lambda_min = (self.formula_t + delta).unsqueeze(1)
         # t-norm TBF
         delta_min = (self.clause_t[0] <= lambda_min) * (lambda_min - self.clause_t[0])
@@ -30,23 +31,87 @@ class SATFormula(Formula):
 
         # The delta applied on the max truth values on each clause
         # Find max inputs for t-conorm TBF. Multiply with sign to deal with negated literals
-        delta_max = torch.take_along_dim(self.sign.unsqueeze(0), max_indices, -1).squeeze() * delta_min
+        delta_max = torch.take_along_dim(sign.unsqueeze(0), max_indices, -1).squeeze() * delta_min
 
         # Find what propositions the results belong to
-        propositions_max_indices = torch.take_along_dim(self.prop_index.unsqueeze(0), max_indices, -1).squeeze()
+        propositions_max_indices = torch.take_along_dim(prop_index.unsqueeze(0), max_indices, -1).squeeze()
         # Uses the mean to combine the deltas on the same proposition
         # How to compute the mean on nonzero values: Take the sum (scatter_add), then count amount of nonzero values
-        self.prop_deltas = torch.scatter_reduce(delta_max, -1, propositions_max_indices, 'sum')
+        prop_deltas = torch.scatter_reduce(delta_max, -1, propositions_max_indices, 'sum')
 
-        # print(delta_max != 0)
         amt_nonzero = torch.scatter_reduce((delta_max != 0).float(), -1, propositions_max_indices, 'sum')
         mask = amt_nonzero > 0
-        self.prop_deltas[mask] = self.prop_deltas[mask] / amt_nonzero[mask]
+        prop_deltas[mask] = prop_deltas[mask] / amt_nonzero[mask]
+        return prop_deltas
 
-        # TODO: Max heuristic can be implemented with a max and a min scatter reduce, then finding pointwise absolute largest value
-        # print(self.prop_deltas, self.prop_deltas.shape)
+class SATLukasiewicz(SATTNorm):
 
-        return delta_max
+    def forward(self, indexed_t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        self.indexed_t = indexed_t
+        self.clause_t = torch.clip(torch.sum(indexed_t, dim=-1), 0, 1)
+        n = self.clause_t.shape[-1]
+        self.formula_t = torch.clip(torch.sum(self.clause_t, dim=-1) - (n-1), 0, 1)
+        return self.formula_t, self.clause_t
+
+    def boost_function(self, delta, prop_index, sign) -> torch.Tensor:
+        # Compute the t-norm boost function
+        w = (self.formula_t + delta).unsqueeze(1)
+        n = self.clause_t.shape[-1]
+        sorted_clauses = torch.sort(self.clause_t, dim=-1, descending=True)
+
+        # Find the delta_M for each M
+        M = torch.arange(1, n+1)
+        delta_M = (w + M - 1 - torch.cumsum(sorted_clauses[0], dim=-1)) / M
+
+        cond = delta_M < 1 - sorted_clauses[0]
+        # Do cond - cond (shifted to the left), then take the argmax.
+        # This finds the largest index for which the condition is true
+        M_star = torch.argmax(cond.float() - torch.roll(cond.float(), -1, -1), dim=-1)
+        # If the condition holds for all clauses, then the max index is the last one
+        M_star[cond.all(dim=-1)] = n - 1
+        delta_M_star = torch.gather(delta_M, -1, M_star.unsqueeze(-1))
+
+        # Assign the respective deltas to the clause truth values
+        delta_sorted_clauses = torch.where(cond, delta_M_star, torch.tensor(0.0))
+        delta_clauses = torch.scatter_reduce(delta_sorted_clauses, -1, sorted_clauses[1], 'sum')
+
+        # Compute the t-conorm boost function
+        clauses_w = torch.clip(self.clause_t + delta_clauses, 0, 1)
+        delta_literals = (torch.clip(clauses_w - torch.sum(self.indexed_t, dim=-1), 0, 1) / 3.0).unsqueeze(-1) * sign
+
+        # Distribute the deltas over the propositions using the mean aggregation
+        prop_index_expand = prop_index.unsqueeze(0).expand(delta_literals.shape).flatten(1, 2)
+        delta_literals_flat = delta_literals.flatten(1, 2)
+        prop_deltas = torch.scatter_reduce(delta_literals_flat, -1, prop_index_expand, 'sum')
+        nonzero_deltas = torch.scatter_reduce((delta_literals_flat != 0).float(), -1, prop_index_expand, 'sum')
+        mask = nonzero_deltas > 0
+        prop_deltas[mask] = prop_deltas[mask] / nonzero_deltas[mask]
+
+        return prop_deltas
+
+
+class SATFormula(Formula):
+    def __init__(self, clauses, tnorm=SATGodel()):
+        self.clause_t = None
+        formula_tensor = torch.tensor(clauses)
+        self.prop_index = formula_tensor.abs() - 1
+        # self.prop_index = formula_tensor.abs()
+        self.sign = formula_tensor.sign()
+        self.tnorm = tnorm
+
+    def function(self, truth_values) -> torch.Tensor:
+        indexed_t = truth_values[..., self.prop_index]
+        indexed_t[..., self.sign < 0] = 1 - indexed_t[..., self.sign < 0]
+
+        self.input_tensor = indexed_t
+
+        # TODO: Implement also for other t-norms
+
+        self.formula_t, self.clause_t = self.tnorm.forward(indexed_t)
+        return self.formula_t
+
+    def boost_function(self, truth_values, delta) -> torch.Tensor:
+        return self.tnorm.boost_function(delta, self.prop_index, self.sign)
 
     def get_name(self, parenthesis=False):
         pass
@@ -61,7 +126,8 @@ class SATFormula(Formula):
         return self.function(truth_values)
 
     def backward(self, delta, randomized=False):
-        return self.boost_function(self.input_tensor, delta)
+        self.prop_deltas = self.boost_function(self.input_tensor, delta)
+        return self.prop_deltas
 
         # TODO: Randomized is not implemented for now
         # if randomized:
@@ -80,7 +146,7 @@ class SATFormula(Formula):
         return s
 
     def sat_sub_formulas(self, truth_values):
-        return torch.mean(self.clause_t[0], 1, keepdim=True)
+        return self.clause_t
 
 #
 # class Predicate(Formula):
