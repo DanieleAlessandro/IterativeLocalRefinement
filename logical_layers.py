@@ -1,9 +1,10 @@
 import torch
 
 class LRL(torch.nn.Module):
-    def __init__(self, formula):
+    def __init__(self, formula, schedule=1.0):
         super().__init__()
         self.formula = formula
+        self.schedule = schedule
 
     def forward(self, truth_values, target, method):
         satisfaction = self.formula.forward(truth_values)
@@ -15,7 +16,7 @@ class LRL(torch.nn.Module):
             return None
 
         # TODO: What about this weird parameter here? It seems to really smooth out the trajectory
-        delta_sat = torch.where(target - satisfaction > 0, (target - satisfaction).double(), 0.).float() / 10.
+        delta_sat = torch.where(target - satisfaction > 0, (target - satisfaction).double(), 0.).float() * self.schedule
 
         self.formula.backward(delta_sat)
         delta_tensor = self.formula.get_delta_tensor(truth_values, method)
