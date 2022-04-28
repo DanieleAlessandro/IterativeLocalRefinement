@@ -11,10 +11,36 @@ def aggregate_mean(delta_literals: torch.Tensor, prop_index: torch.Tensor) -> to
     prop_deltas = torch.scatter_reduce(delta_literals, -1, prop_index, 'sum')
 
     # Check what values are nonzero (or not almost zero)
-    amt_nonzero = torch.scatter_reduce((torch.abs(delta_literals) > 0.0000001).float(), -1, prop_index, 'sum')
+    amt_nonzero = torch.scatter_reduce((torch.abs(delta_literals) > 1e-6).float(), -1, prop_index, 'sum')
     mask = amt_nonzero > 0
     prop_deltas[mask] = prop_deltas[mask] / amt_nonzero[mask]
     return prop_deltas
+
+def aggregate_max(delta_literals: torch.Tensor, prop_index: torch.Tensor, randomized=False) -> torch.Tensor:
+    # Uses the absolute max value to combine the deltas on the same proposition
+    prop_deltas_max = torch.scatter_reduce(delta_literals, -1, prop_index, 'amax')
+    prop_deltas_min = torch.scatter_reduce(delta_literals, -1, prop_index, 'amin')
+    if randomized:
+        prob = torch.sigmoid((prop_deltas_max.abs() - prop_deltas_min.abs())/0.01)
+        prop_deltas = torch.where(torch.bernoulli(prob).bool(), prop_deltas_max, prop_deltas_min)
+    else:
+        cond: torch.Tensor = prop_deltas_max.abs() > prop_deltas_min.abs()
+        prop_deltas = torch.where(cond, prop_deltas_max, prop_deltas_min)
+    return prop_deltas
+
+def aggregate_min(delta_literals: torch.Tensor, prop_index: torch.Tensor, threshold=0.01) -> torch.Tensor:
+    # Uses the absolute min values, among values larger than threshold, to combine the deltas on the same proposition
+    prop_deltas_max = torch.scatter_reduce(
+        delta_literals * (delta_literals < -threshold) - (delta_literals >= -threshold).float(),
+        -1, prop_index, 'amax')
+    prop_deltas_min = torch.scatter_reduce(
+        delta_literals * (delta_literals >  threshold) + (delta_literals <=  threshold).float(),
+        -1, prop_index, 'amin')
+    prop_deltas = torch.where(prop_deltas_max.abs() < prop_deltas_min.abs(), prop_deltas_max, prop_deltas_min)
+    prop_deltas[prop_deltas == 1] = 0
+    prop_deltas[prop_deltas == -1] = 0
+    return prop_deltas
+
 
 class SATTNorm(ABC):
 
@@ -105,6 +131,9 @@ class SATLukasiewicz(SATTNorm):
         return s, formula_t
 
 class SATProduct(SATTNorm):
+
+    def __init__(self, aggregate='mean'):
+        self.aggregate = aggregate
     """
     We could technically reuse this for other norms with p=1
     """
@@ -157,7 +186,12 @@ class SATProduct(SATTNorm):
         # Find what propositions the results belong to
         propositions_max_indices = torch.take_along_dim(prop_index.unsqueeze(0), max_indices, -1).squeeze()
 
-        prop_deltas = aggregate_mean(delta_max_literal, propositions_max_indices)
+        if self.aggregate == 'mean':
+            prop_deltas = aggregate_mean(delta_max_literal, propositions_max_indices)
+        elif self.aggregate == 'max':
+            prop_deltas = aggregate_max(delta_max_literal, propositions_max_indices)
+        elif self.aggregate == 'min':
+            prop_deltas = aggregate_min(delta_max_literal, propositions_max_indices)
 
         return prop_deltas
 

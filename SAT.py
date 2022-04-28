@@ -21,7 +21,7 @@ print(list_of_files)
 results_lrl = []
 results_ltn = []
 
-tnorm = SATProduct()
+
 for problem_number, filename in enumerate(list_of_files):
     problem_number += 1
     print('Problem n. ' + str(problem_number) + '/' + str(n_formulas), flush=True)
@@ -46,9 +46,8 @@ for problem_number, filename in enumerate(list_of_files):
         z = next(generator)
         initial_truth_values = torch.sigmoid(z)
 
-        f = SATFormula(clauses, False, tnorm)
-
         for method in methods:
+            f = SATFormula(clauses, False, SATProduct(aggregate=method))
             for lrl_schedule in lrl_schedules:
                 start = time.time()
 
@@ -82,7 +81,7 @@ for problem_number, filename in enumerate(list_of_files):
                 end = time.time()
                 print(f'LRL@{lrl_schedule}: {torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()}     Time: {(end - start)}')
 
-        f = SATFormula(clauses, True, tnorm)
+        f = SATFormula(clauses, True, SATProduct(aggregate="mean"))
 
         # ========================================== SGD ==========================================
         for reg_lambda in regularization_lambda_list:

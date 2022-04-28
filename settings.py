@@ -6,6 +6,7 @@ n_formulas = 10
 # Hyper parameters
 targets = [0.3, 0.5, 0.8, 1.0]  # list of target truth values for both LRL and LTN
 # methods = ['max', 'mean']  # list of aggregation methods for LRL
-methods = ['mean']  # list of aggregation methods for LRL TODO: Currently only mean is implemented
-regularization_lambda_list = [1.0, 0.1, 0.01, 0.0]  # regularization hyperparameter for LTN
+methods = ['mean', "max", "min"]  # list of aggregation methods for LRL
+# regularization_lambda_list = [1.0, 0.1, 0.01, 0.0]  # regularization hyperparameter for LTN
+regularization_lambda_list = []  # regularization hyperparameter for LTN
 lrl_schedules = [1.0, 0.1] # The scheduling on the delta of LRL
