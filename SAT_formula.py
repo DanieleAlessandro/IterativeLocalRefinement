@@ -5,6 +5,17 @@ from abc import ABC, abstractmethod
 
 from Formula import Formula
 
+def aggregate_mean(delta_literals: torch.Tensor, prop_index: torch.Tensor) -> torch.Tensor:
+    # Uses the mean to combine the deltas on the same proposition
+    # How to compute the mean on nonzero values: Take the sum (scatter_add), then count amount of nonzero values
+    prop_deltas = torch.scatter_reduce(delta_literals, -1, prop_index, 'sum')
+
+    # Check what values are nonzero (or not almost zero)
+    amt_nonzero = torch.scatter_reduce((torch.abs(delta_literals) > 0.0000001).float(), -1, prop_index, 'sum')
+    mask = amt_nonzero > 0
+    prop_deltas[mask] = prop_deltas[mask] / amt_nonzero[mask]
+    return prop_deltas
+
 class SATTNorm(ABC):
 
     clause_t: torch.Tensor
@@ -41,13 +52,7 @@ class SATGodel(SATTNorm):
 
         # Find what propositions the results belong to
         propositions_max_indices = torch.take_along_dim(prop_index.unsqueeze(0), max_indices, -1).squeeze()
-        # Uses the mean to combine the deltas on the same proposition
-        # How to compute the mean on nonzero values: Take the sum (scatter_add), then count amount of nonzero values
-        prop_deltas = torch.scatter_reduce(delta_max, -1, propositions_max_indices, 'sum')
-
-        amt_nonzero = torch.scatter_reduce((delta_max != 0).float(), -1, propositions_max_indices, 'sum')
-        mask = amt_nonzero > 0
-        prop_deltas[mask] = prop_deltas[mask] / amt_nonzero[mask]
+        prop_deltas = aggregate_mean(delta_max, propositions_max_indices)
         return prop_deltas
 
 class SATLukasiewicz(SATTNorm):
@@ -88,10 +93,7 @@ class SATLukasiewicz(SATTNorm):
         # Distribute the deltas over the propositions using the mean aggregation
         prop_index_expand = prop_index.unsqueeze(0).expand(delta_literals.shape).flatten(1, 2)
         delta_literals_flat = delta_literals.flatten(1, 2)
-        prop_deltas = torch.scatter_reduce(delta_literals_flat, -1, prop_index_expand, 'sum')
-        nonzero_deltas = torch.scatter_reduce((delta_literals_flat != 0).float(), -1, prop_index_expand, 'sum')
-        mask = nonzero_deltas > 0
-        prop_deltas[mask] = prop_deltas[mask] / nonzero_deltas[mask]
+        prop_deltas = aggregate_mean(delta_literals_flat, prop_index_expand)
 
         return prop_deltas
 
@@ -124,17 +126,21 @@ class SATProduct(SATTNorm):
         lamd = torch.pow(
             w / torch.cat([onez, torch.cumprod(sorted_clauses[0], dim=-1)], dim=-1),
             1 / (n - torch.arange(0, n+1).unsqueeze(0)))
-        # Choose the right value lambda depending on what values exceed it
-        cond = lamd < torch.cat([onez, sorted_clauses[0]], dim=-1)
-        i_lambda = torch.argmax(cond.float() - torch.roll(cond.float(), -1, -1), dim=-1)
 
-        # This should never happen...
+        # OLD CODE: This should compute the same thing but is slower
+        # # Choose the right value lambda depending on what values exceed it
+        # cond = lamd < torch.cat([onez, sorted_clauses[0]], dim=-1)
+        # i_lambda = torch.argmax(cond.float() - torch.roll(cond.float(), -1, -1), dim=-1)
         # i_lambda[cond.all(dim=-1)] = n - 1
+        # chosen_lambdas = torch.gather(lamd, -1, i_lambda.unsqueeze(-1))
+        # # We choose cond[..., 1:] because the first value is always 1
+        # delta_sorted_clauses = torch.where(cond[..., 1:], torch.tensor(0.0), chosen_lambdas - sorted_clauses[0])
+        # delta_clauses = torch.scatter_reduce(delta_sorted_clauses, -1, sorted_clauses[1], 'sum')
 
-        chosen_lambdas = torch.gather(lamd, -1, i_lambda.unsqueeze(-1))
-        # We choose cond[..., 1:] because the first value is always 1
-        delta_sorted_clauses = torch.where(cond[..., 1:], torch.tensor(0.0), chosen_lambdas - sorted_clauses[0])
-        delta_clauses = torch.scatter_reduce(delta_sorted_clauses, -1, sorted_clauses[1], 'sum')
+        # NEW CODE: Apparently, the smallest lambda finds exactly the same as i_lambda in the previous snippet
+        # We don't have a proof for this but it works...
+        chosen_lambdas = torch.min(lamd, dim=-1, keepdim=True)[0]
+        delta_clauses = torch.where(self.clause_t < chosen_lambdas, chosen_lambdas - self.clause_t, torch.tensor(0.0))
 
         # Compute the t-conorm boost function
         clauses_w = self.clause_t + delta_clauses
@@ -148,18 +154,11 @@ class SATProduct(SATTNorm):
         delta_max_literal = (1 - max_literals[0] - delta_divisor
                              ) * torch.take_along_dim(sign.unsqueeze(0), max_indices, -1).squeeze()
 
-        if torch.isnan(delta_max_literal).any():
-            print("NaN in delta_max_literal")
         # Find what propositions the results belong to
         propositions_max_indices = torch.take_along_dim(prop_index.unsqueeze(0), max_indices, -1).squeeze()
-        # Uses the mean to combine the deltas on the same proposition
-        # How to compute the mean on nonzero values: Take the sum (scatter_add), then count amount of nonzero values
-        prop_deltas = torch.scatter_reduce(delta_max_literal, -1, propositions_max_indices, 'sum')
 
-        # Check what values are nonzero (or not almost zero)
-        amt_nonzero = torch.scatter_reduce((torch.abs(delta_max_literal) > 0.0000001).float(), -1, propositions_max_indices, 'sum')
-        mask = amt_nonzero > 0
-        prop_deltas[mask] = prop_deltas[mask] / amt_nonzero[mask]
+        prop_deltas = aggregate_mean(delta_max_literal, propositions_max_indices)
+
         return prop_deltas
 
     def sgd_function(self, indexed_t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
