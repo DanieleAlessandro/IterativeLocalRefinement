@@ -41,6 +41,15 @@ def aggregate_min(delta_literals: torch.Tensor, prop_index: torch.Tensor, thresh
     prop_deltas[prop_deltas == -1] = 0
     return prop_deltas
 
+def aggregate(delta_literals: torch.Tensor, prop_index: torch.Tensor, method: str, **kwargs) -> torch.Tensor:
+    if method == 'mean':
+        return aggregate_mean(delta_literals, prop_index, **kwargs)
+    elif method == 'max':
+        return aggregate_max(delta_literals, prop_index, **kwargs)
+    elif method == 'min':
+        return aggregate_min(delta_literals, prop_index, **kwargs)
+
+
 def tnorm_constructor(tnorm: str, aggregate_func, props=20):
     if tnorm == 'godel':
         return SATGodel(aggregate_func )
@@ -73,15 +82,28 @@ class SATGodel(SATTNorm):
         self.aggregate_func = aggregate_func
 
     def forward(self, indexed_t: torch.Tensor) -> torch.Tensor:
+        self.indexed_t = indexed_t
         self.clause_t_g = torch.max(indexed_t, dim=2)
         self.clause_t = self.clause_t_g[0]
         self.formula_t = torch.min(self.clause_t, dim=1)[0]
         return self.formula_t
 
     def boost_function(self, delta, prop_index, sign) -> torch.Tensor:
-        lambda_min = (self.formula_t + delta).unsqueeze(1)
+        cond = delta > 0
+        require_max = cond.any()
+        if require_max:
+            boost_max = self.boost_function_max(delta, prop_index, sign)
+            if (delta < 0).any():
+                boost_min = self.boost_function_min(delta, prop_index, sign)
+                return torch.where(cond.unsqueeze(-1), boost_max, boost_min)
+            return boost_max
+        return self.boost_function_min(delta, prop_index, sign)
+
+
+    def boost_function_max(self, delta, prop_index, sign) -> torch.Tensor:
+        w_min = (self.formula_t + delta).unsqueeze(1)
         # t-norm TBF
-        delta_min = (self.clause_t <= lambda_min) * (lambda_min - self.clause_t)
+        delta_min = (self.clause_t <= w_min) * (w_min - self.clause_t)
         max_indices = self.clause_t_g[1].unsqueeze(-1)
 
         # The delta applied on the max truth values on each clause
@@ -90,13 +112,22 @@ class SATGodel(SATTNorm):
 
         # Find what propositions the results belong to
         propositions_max_indices = torch.take_along_dim(prop_index.unsqueeze(0), max_indices, -1).squeeze()
-        if self.aggregate_func == 'mean':
-            prop_deltas = aggregate_mean(delta_max, propositions_max_indices)
-        elif self.aggregate_func == 'max':
-            prop_deltas = aggregate_max(delta_max, propositions_max_indices)
-        elif self.aggregate_func == 'min':
-            prop_deltas = aggregate_min(delta_max, propositions_max_indices)
+        prop_deltas = aggregate(delta_max, propositions_max_indices, self.aggregate_func)
         return prop_deltas
+
+    def boost_function_min(self, delta, prop_index, sign) -> torch.Tensor:
+        w_min = (self.formula_t + delta).unsqueeze(1)
+        # t-norm TBF
+        min_clauses = torch.min(self.clause_t, dim=-1)
+        min_clause_literals = self.indexed_t[torch.arange(self.indexed_t.shape[0]), min_clauses[1]]
+        delta_literals = torch.where(min_clause_literals > w_min,
+                                     w_min - min_clause_literals,
+                                     torch.zeros_like(min_clause_literals)) * sign[min_clauses[1]]
+        prop_index_max = prop_index[min_clauses[1]]
+        prop_deltas = aggregate(delta_literals, prop_index_max, self.aggregate_func)
+        return prop_deltas
+
+
 
 class SATLukasiewicz(SATTNorm):
 
@@ -139,12 +170,7 @@ class SATLukasiewicz(SATTNorm):
         # Distribute the deltas over the propositions using the mean aggregation
         prop_index_expand = prop_index.unsqueeze(0).expand(delta_literals.shape).flatten(1, 2)
         delta_literals_flat = delta_literals.flatten(1, 2)
-        if self.aggregate_func == 'mean':
-            prop_deltas = aggregate_mean(delta_literals_flat, prop_index_expand)
-        elif self.aggregate_func == 'max':
-            prop_deltas = aggregate_max(delta_literals_flat, prop_index_expand)
-        elif self.aggregate_func == 'min':
-            prop_deltas = aggregate_min(delta_literals_flat, prop_index_expand)
+        prop_deltas = aggregate(delta_literals_flat, prop_index_expand, self.aggregate_func)
 
         return prop_deltas
 
@@ -157,8 +183,8 @@ class SATLukasiewicz(SATTNorm):
 
 class SATProduct(SATTNorm):
 
-    def __init__(self, aggregate='max'):
-        self.aggregate = aggregate
+    def __init__(self, aggregate_func='max'):
+        self.aggregate_func = aggregate_func
     """
     We could technically reuse this for other norms with p=1
     """
@@ -211,12 +237,7 @@ class SATProduct(SATTNorm):
         # Find what propositions the results belong to
         propositions_max_indices = torch.take_along_dim(prop_index.unsqueeze(0), max_indices, -1).squeeze()
 
-        if self.aggregate == 'mean':
-            prop_deltas = aggregate_mean(delta_max_literal, propositions_max_indices)
-        elif self.aggregate == 'max':
-            prop_deltas = aggregate_max(delta_max_literal, propositions_max_indices)
-        elif self.aggregate == 'min':
-            prop_deltas = aggregate_min(delta_max_literal, propositions_max_indices)
+        prop_deltas = aggregate(delta_max_literal, propositions_max_indices, self.aggregate_func)
 
         return prop_deltas
 

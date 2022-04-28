@@ -35,9 +35,9 @@ for problem_number, filename in enumerate(list_of_files):
 
     # predicates = create_predicates(n)
     # f_non_parallel = create_formula(predicates, clauses)
-    for t in targets:
-        print('Target: ' + str(t))
-        t_tensor = torch.Tensor([t])
+    for w in targets:
+        print('Target: ' + str(w))
+        w_tensor = torch.Tensor([w])
 
         # Generate initial random pre-activations
         # The initialize_pre_activations first returns a not learnable tensor (used by LRL), from
@@ -54,10 +54,10 @@ for problem_number, filename in enumerate(list_of_files):
                 # ========================================== LRL ==========================================
 
                 # Define the model
-                lrl = LRLModel(f, n_steps, t, lrl_schedule)
+                lrl = LRL(f, n_steps, lrl_schedule)
 
                 # Optimization
-                lrl_predictions = lrl(initial_truth_values, method)
+                lrl_predictions = lrl(initial_truth_values, w, method)
 
                 # For debugging purposes
                 # lrl = LRLModel(f_non_parallel, n_steps, t)
@@ -69,7 +69,7 @@ for problem_number, filename in enumerate(list_of_files):
 
                 results_lrl.append({  #_f: fuzzy truth values used, _c: classic logic (defuzzified)
                     'formula': filename,
-                    'target': t,
+                    'target': w,
                     'method': method,
                     'schedule': lrl_schedule,
                     'sat_f': lrl_sat_f,
@@ -100,9 +100,9 @@ for problem_number, filename in enumerate(list_of_files):
 
             # TODO: This needs to be made generic
             if tnorm == "product":
-                sgd_t = t_tensor.log()
+                sgd_t = w_tensor.log()
             else:
-                sgd_t = t_tensor
+                sgd_t = w_tensor
 
             for i in range(n_steps):
                 sgd_value, _ = ltn(z)
@@ -120,7 +120,7 @@ for problem_number, filename in enumerate(list_of_files):
 
             results_ltn.append({
                 'formula': filename,
-                'target': t,
+                'target': w,
                 'lambda': reg_lambda,
                 'sat_f': ltn_sat_f,
                 'sat_c': ltn_sat_c,

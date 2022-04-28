@@ -108,28 +108,6 @@ def evaluate_solutions(formula, predictions_list, initial_predictions, fuzzy=Tru
         return satisfactions, norms, n_clauses
 
 
-class LRLModel(torch.nn.Module):
-    def __init__(self, formula, n_layers, w, schedule=1.0):
-        super().__init__()
-        self.formula = formula
-        self.layers = []
-        self.w = w
-        for _ in range(n_layers):
-            self.layers.append(LRL(formula, schedule))
-
-    def forward(self, initial_t, method):
-        predictions = [initial_t]
-
-        for l in self.layers:
-            next_prediction = l(predictions[-1], self.w, method)
-            if next_prediction is None:
-                break
-
-            predictions.append(next_prediction)  # TODO: need to check
-
-        return predictions
-
-
 class LTNModel(torch.nn.Module):
     def __init__(self, formula):
         super().__init__()
