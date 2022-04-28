@@ -13,3 +13,6 @@ methods = ["mean", "max"]  # list of aggregation methods for LRL
 regularization_lambda_list = [1.0, 0.1, 0.01, 0.0]  # regularization hyperparameter for LTN
 # regularization_lambda_list = []  # regularization hyperparameter for LTN
 lrl_schedules = [1.0, 0.1] # The scheduling on the delta of LRL
+
+# Settings for plots
+grid = True
