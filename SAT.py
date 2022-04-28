@@ -43,8 +43,8 @@ for problem_number, filename in enumerate(list_of_files):
         # The initialize_pre_activations first returns a not learnable tensor (used by LRL), from
         # the second next it returns the same exact value as a new learnable parameter (used by LTN)
         generator = initialize_pre_activations(n, n_initial_vectors)
-        z = next(generator)
-        initial_truth_values = torch.sigmoid(z)
+
+        initial_truth_values = torch.sigmoid(next(generator))
 
         for method in methods:
             f = SATFormula(clauses, False, tnorm_constructor(tnorm, method))
@@ -57,7 +57,7 @@ for problem_number, filename in enumerate(list_of_files):
                 lrl = LRLModel(f, n_steps, t, lrl_schedule)
 
                 # Optimization
-                lrl_predictions = lrl(z, method)
+                lrl_predictions = lrl(initial_truth_values, method)
 
                 # For debugging purposes
                 # lrl = LRLModel(f_non_parallel, n_steps, t)

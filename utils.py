@@ -92,7 +92,8 @@ def evaluate_solutions(formula, predictions_list, initial_predictions, fuzzy=Tru
     norms = []
     if fuzzy:
         for predictions in predictions_list:
-            satisfactions.append(torch.mean(formula.satisfaction(predictions)).tolist())
+            form_sat = formula.satisfaction(predictions)
+            satisfactions.append(torch.mean(form_sat).tolist())
             norms.append(torch.linalg.vector_norm(predictions - initial_predictions, ord=1).tolist())
 
         return satisfactions, norms
@@ -116,8 +117,8 @@ class LRLModel(torch.nn.Module):
         for _ in range(n_layers):
             self.layers.append(LRL(formula, schedule))
 
-    def forward(self, pre_activations, method):
-        predictions = [torch.sigmoid(pre_activations)]
+    def forward(self, initial_t, method):
+        predictions = [initial_t]
 
         for l in self.layers:
             next_prediction = l(predictions[-1], self.w, method)

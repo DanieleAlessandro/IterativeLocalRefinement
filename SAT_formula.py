@@ -64,7 +64,7 @@ class SATTNorm(ABC):
         pass
 
     def sgd_function(self, indexed_t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        t = self.forward(indexed_t)[0]
+        t = self.forward(indexed_t)
         return t, t
 
 class SATGodel(SATTNorm):
