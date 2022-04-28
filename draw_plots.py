@@ -63,23 +63,26 @@ for t in targets:
     if not os.path.exists('plots/w_' + str(t)):
         os.mkdir('plots/w_' + str(t))
 
-if grid:
-    plt.rcParams["figure.figsize"] = (24, 20)
-    plt.subplots_adjust(right=0.7)
-    fig, axes = plt.subplots(5, 4, sharex='col', sharey='row')
-else:
-    axes = None
+def create_figures(grid):
+    if grid:
+        plt.rcParams["figure.figsize"] = (24, 20)
+        plt.subplots_adjust(right=0.7)
+        fig, axes = plt.subplots(5, 4, sharex='col', sharey='row')
+    else:
+        axes = None
 
-generate_plots('sat_f', 'Satisfaction (fuzzy logic)', 'fuzzy sat', 'sat_f', axs=axes, plot_row=0, grid=grid)
-generate_plots('norm_f', 'L1 norm (fuzzy logic)', 'L1 norm', 'fuzzy_norm', axs=axes, plot_row=1, grid=grid)
-generate_plots('sat_c', 'Satisfaction (classic logic)', 'sat', 'sat_c', axs=axes, plot_row=2, grid=grid)
-generate_plots('n_clauses_satisfied_c', 'Proportion of satisfied clauses (classic logic)', 'n sat', 'n_clauses', axs=axes, plot_row=3, grid=grid)
-generate_plots('norm_c', 'L1 norm (classic logic)', 'L1 norm', 'crisp_norm', axs=axes, plot_row=4, grid=grid)
+    generate_plots('sat_f', 'Satisfaction (fuzzy logic)', 'fuzzy sat', 'sat_f', axs=axes, plot_row=0, grid=grid)
+    generate_plots('norm_f', 'L1 norm (fuzzy logic)', 'L1 norm', 'fuzzy_norm', axs=axes, plot_row=1, grid=grid)
+    generate_plots('sat_c', 'Satisfaction (classic logic)', 'sat', 'sat_c', axs=axes, plot_row=2, grid=grid)
+    generate_plots('n_clauses_satisfied_c', 'Proportion of satisfied clauses (classic logic)', 'n sat', 'n_clauses', axs=axes, plot_row=3, grid=grid)
+    generate_plots('norm_c', 'L1 norm (classic logic)', 'L1 norm', 'crisp_norm', axs=axes, plot_row=4, grid=grid)
 
-if grid:
-    fig.savefig('plots/results.png')
-    plt.close()
+    if grid:
+        fig.savefig('plots/results.png')
+        plt.close()
 
+create_figures(False)
+create_figures(True)
 # row_labels = ['a','c','x','x','x']
 # column_labels = ['zaza', 'c','x','x']
 
