@@ -65,9 +65,9 @@ for t in targets:
 
 def create_figures(grid):
     if grid:
-        plt.rcParams["figure.figsize"] = (24, 20)
+        plt.rcParams["figure.figsize"] = (28, 20)
         plt.subplots_adjust(right=0.7)
-        fig, axes = plt.subplots(5, 4, sharex='col', sharey='row')
+        fig, axes = plt.subplots(6, 4, sharex='col', sharey='row')
     else:
         axes = None
 

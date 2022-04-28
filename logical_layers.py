@@ -1,13 +1,14 @@
 import torch
 
 class LRL(torch.nn.Module):
-    def __init__(self, formula, max_iterations, schedule=1.0):
+    def __init__(self, formula, max_iterations, method='mean', schedule=1.0):
         super().__init__()
         self.formula = formula
         self.schedule = schedule
         self.max_iterations = max_iterations
+        self.method = method
 
-    def forward(self, initial_t, w, method):
+    def forward(self, initial_t, w):
         predictions = [initial_t]
         truth_values = initial_t
         prev_satisfaction = w
@@ -25,7 +26,7 @@ class LRL(torch.nn.Module):
             # delta_sat = torch.where(target - satisfaction > 0, (target - satisfaction).double(), 0.).float() * self.schedule
             delta_sat = (w - satisfaction) * self.schedule
             self.formula.backward(delta_sat)
-            delta_tensor = self.formula.get_delta_tensor(truth_values, method)
+            delta_tensor = self.formula.get_delta_tensor(truth_values, self.method)
 
             # The clip function is called to remove numeric errors (small negative values)
             truth_values = torch.clip(truth_values + delta_tensor, min=0.0, max=1.0)

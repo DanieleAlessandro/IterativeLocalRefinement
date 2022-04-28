@@ -17,10 +17,10 @@ np.random.seed(seed)
 # TODO:
 #  - NB: w diverso da lr perchè propagato nella backward invece di essere moltiplicato sui nodi
 
-def evaluate(predictions, initial_truth_values, time, filename, hyperparams: dict):
+def evaluate(formula, predictions, initial_truth_values, time, filename, hyperparams: dict):
     # Evaluation
-    sat_f, norm1_f, norm2_f = evaluate_solutions(f, predictions, initial_truth_values)
-    sat_c, norm_c, n_clauses = evaluate_solutions(f, defuzzify_list(lrl_predictions),
+    sat_f, norm1_f, norm2_f = evaluate_solutions(formula, predictions, initial_truth_values)
+    sat_c, norm_c, n_clauses = evaluate_solutions(formula, defuzzify_list(predictions),
                                                               defuzzify(initial_truth_values), fuzzy=False)
 
     return (hyperparams | {  # _f: fuzzy truth values used, _c: classic logic (defuzzified)
@@ -72,7 +72,7 @@ for problem_number, filename in enumerate(list_of_files):
                 lrl = LRL(f, n_steps, lrl_schedule)
 
                 # Optimization
-                lrl_predictions = lrl(initial_truth_values, w, method)
+                lrl_predictions = lrl(initial_truth_values, w)
 
                 # For debugging purposes
                 # lrl = LRLModel(f_non_parallel, n_steps, t)
@@ -80,7 +80,7 @@ for problem_number, filename in enumerate(list_of_files):
 
                 time_cost = time.time() - start
                 print(f'LRL@{lrl_schedule}: {torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()}     Time: {time_cost}')
-                lrl_predictions.append(evaluate(lrl_predictions, initial_truth_values, time_cost, filename, {
+                results_lrl.append(evaluate(f, lrl_predictions, initial_truth_values, time_cost, filename, {
                     'method': method,
                     'schedule': lrl_schedule,
                     'target': w
@@ -119,7 +119,7 @@ for problem_number, filename in enumerate(list_of_files):
             time_cost = time.time() - start
             print(f'LTN@{reg_lambda}: {torch.mean(f.satisfaction(ltn_predictions[-1])).tolist()}     Time: {time_cost}')
 
-            ltn_predictions.append(evaluate(ltn_predictions, initial_truth_values, time_cost, filename, {
+            results_ltn.append(evaluate(f, ltn_predictions, initial_truth_values, time_cost, filename, {
                 'lambda': reg_lambda,
                 'target': w
             }))
