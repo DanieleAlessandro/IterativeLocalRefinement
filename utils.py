@@ -3,7 +3,7 @@ from Godel import *
 from logical_layers import *
 
 
-def parse_cnf(in_data):
+def parse_cnf(in_data, amt_rules: int):
     cnf = list()
     cnf.append(list())
     maxvar = 0
@@ -13,6 +13,8 @@ def parse_cnf(in_data):
 
         if len(tokens) != 0:
             if tokens[0] not in ("p", "c", "%"):
+                if len(cnf) == amt_rules + 2:
+                    break
                 for tok in tokens:
                     lit = int(tok)
                     maxvar = max(maxvar, abs(lit))
@@ -21,9 +23,9 @@ def parse_cnf(in_data):
                     else:
                         # lit = lit - 1 if lit > 0 else lit + 1
                         cnf[-1].append(lit)
+
             elif tokens[0] == 'p':
                 number_of_variables = int(tokens[2])
-
 
     assert len(cnf[-1]) == 0
     cnf.pop()

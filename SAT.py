@@ -15,7 +15,7 @@ np.random.seed(seed)
 # TODO:
 #  - NB: w diverso da lr perchè propagato nella backward invece di essere moltiplicato sui nodi
 
-list_of_files = random.sample(os.listdir('uf20-91'), n_formulas)
+list_of_files = os.listdir('uf20-91')[:n_formulas]
 print(list_of_files)
 
 results_lrl = []
@@ -30,7 +30,7 @@ for problem_number, filename in enumerate(list_of_files):
         l = f.readlines()
 
     # Read knowledge
-    clauses, n = parse_cnf(l)
+    clauses, n = parse_cnf(l, amt_rules)
 
 
     # predicates = create_predicates(n)
@@ -97,9 +97,13 @@ for problem_number, filename in enumerate(list_of_files):
             optimizer = torch.optim.SGD([z], lr=0.1)
 
             ltn_predictions = [torch.sigmoid(z)]
+
+            # TODO: This needs to be made generic
+            sgd_t = t_tensor.log()
+
             for i in range(n_steps):
                 sgd_value, _ = ltn(z)
-                s = torch.linalg.vector_norm(sgd_value - t_tensor, ord=2) + \
+                s = torch.linalg.vector_norm(sgd_value - sgd_t, ord=2) + \
                     reg_lambda * torch.linalg.vector_norm(torch.sigmoid(z) - initial_truth_values, ord=1)
                 s.backward()
                 optimizer.step()
