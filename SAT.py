@@ -1,4 +1,4 @@
-from SAT_formula import SATFormula, SATLukasiewicz, SATProduct
+from SAT_formula import SATFormula, SATLukasiewicz, SATProduct, tnorm_constructor
 from utils import *
 import os
 import numpy as np
@@ -47,7 +47,7 @@ for problem_number, filename in enumerate(list_of_files):
         initial_truth_values = torch.sigmoid(z)
 
         for method in methods:
-            f = SATFormula(clauses, False, SATProduct(aggregate=method))
+            f = SATFormula(clauses, False, tnorm_constructor(tnorm, method))
             for lrl_schedule in lrl_schedules:
                 start = time.time()
 
@@ -81,7 +81,7 @@ for problem_number, filename in enumerate(list_of_files):
                 end = time.time()
                 print(f'LRL@{lrl_schedule}: {torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()}     Time: {(end - start)}')
 
-        f = SATFormula(clauses, True, SATProduct(aggregate="mean"))
+        f = SATFormula(clauses, True, tnorm_constructor(tnorm, "mean"))
 
         # ========================================== SGD ==========================================
         for reg_lambda in regularization_lambda_list:
@@ -99,7 +99,10 @@ for problem_number, filename in enumerate(list_of_files):
             ltn_predictions = [torch.sigmoid(z)]
 
             # TODO: This needs to be made generic
-            sgd_t = t_tensor.log()
+            if tnorm == "product":
+                sgd_t = t_tensor.log()
+            else:
+                sgd_t = t_tensor
 
             for i in range(n_steps):
                 sgd_value, _ = ltn(z)

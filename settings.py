@@ -6,6 +6,7 @@ n_formulas = 10
 amt_rules = 10 # Max is 91
 
 # Hyper parameters
+tnorm = 'godel'
 targets = [0.3, 0.5, 0.8, 1.0]  # list of target truth values for both LRL and LTN
 # methods = ['max', 'mean', 'min']  # list of aggregation methods for LRL
 methods = ["mean", "max"]  # list of aggregation methods for LRL

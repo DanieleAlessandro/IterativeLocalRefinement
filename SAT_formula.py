@@ -41,6 +41,15 @@ def aggregate_min(delta_literals: torch.Tensor, prop_index: torch.Tensor, thresh
     prop_deltas[prop_deltas == -1] = 0
     return prop_deltas
 
+def tnorm_constructor(tnorm: str, aggregate_func, props=20):
+    if tnorm == 'godel':
+        return SATGodel(aggregate_func )
+    elif tnorm == 'lukasiewicz':
+        return SATLukasiewicz(aggregate_func)
+    elif tnorm == 'product':
+        return SATProduct(aggregate_func)
+    else:
+        raise ValueError("Unknown tnorm: {}".format(tnorm))
 
 class SATTNorm(ABC):
 
@@ -60,6 +69,9 @@ class SATTNorm(ABC):
 
 class SATGodel(SATTNorm):
 
+    def __init__(self, aggregate_func):
+        self.aggregate_func = aggregate_func
+
     def forward(self, indexed_t: torch.Tensor) -> torch.Tensor:
         self.clause_t_g = torch.max(indexed_t, dim=2)
         self.clause_t = self.clause_t_g[0]
@@ -78,10 +90,18 @@ class SATGodel(SATTNorm):
 
         # Find what propositions the results belong to
         propositions_max_indices = torch.take_along_dim(prop_index.unsqueeze(0), max_indices, -1).squeeze()
-        prop_deltas = aggregate_mean(delta_max, propositions_max_indices)
+        if self.aggregate_func == 'mean':
+            prop_deltas = aggregate_mean(delta_max, propositions_max_indices)
+        elif self.aggregate_func == 'max':
+            prop_deltas = aggregate_max(delta_max, propositions_max_indices)
+        elif self.aggregate_func == 'min':
+            prop_deltas = aggregate_min(delta_max, propositions_max_indices)
         return prop_deltas
 
 class SATLukasiewicz(SATTNorm):
+
+    def __init__(self, aggregate_func):
+        self.aggregate_func = aggregate_func
 
     def forward(self, indexed_t: torch.Tensor) -> torch.Tensor:
         self.indexed_t = indexed_t
@@ -119,7 +139,12 @@ class SATLukasiewicz(SATTNorm):
         # Distribute the deltas over the propositions using the mean aggregation
         prop_index_expand = prop_index.unsqueeze(0).expand(delta_literals.shape).flatten(1, 2)
         delta_literals_flat = delta_literals.flatten(1, 2)
-        prop_deltas = aggregate_mean(delta_literals_flat, prop_index_expand)
+        if self.aggregate_func == 'mean':
+            prop_deltas = aggregate_mean(delta_literals_flat, prop_index_expand)
+        elif self.aggregate_func == 'max':
+            prop_deltas = aggregate_max(delta_literals_flat, prop_index_expand)
+        elif self.aggregate_func == 'min':
+            prop_deltas = aggregate_min(delta_literals_flat, prop_index_expand)
 
         return prop_deltas
 
@@ -204,7 +229,7 @@ class SATProduct(SATTNorm):
 
 
 class SATFormula(Formula):
-    def __init__(self, clauses, is_sgd=False, tnorm=SATGodel()):
+    def __init__(self, clauses, is_sgd=False, tnorm=SATGodel("mean")):
         self.clause_t = None
         self.is_sgd = is_sgd
         formula_tensor = torch.tensor(clauses)
