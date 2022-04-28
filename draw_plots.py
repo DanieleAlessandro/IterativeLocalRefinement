@@ -72,10 +72,11 @@ def create_figures(grid):
         axes = None
 
     generate_plots('sat_f', 'Satisfaction (fuzzy logic)', 'fuzzy sat', 'sat_f', axs=axes, plot_row=0, grid=grid)
-    generate_plots('norm_f', 'L1 norm (fuzzy logic)', 'L1 norm', 'fuzzy_norm', axs=axes, plot_row=1, grid=grid)
-    generate_plots('sat_c', 'Satisfaction (classic logic)', 'sat', 'sat_c', axs=axes, plot_row=2, grid=grid)
-    generate_plots('n_clauses_satisfied_c', 'Proportion of satisfied clauses (classic logic)', 'n sat', 'n_clauses', axs=axes, plot_row=3, grid=grid)
-    generate_plots('norm_c', 'L1 norm (classic logic)', 'L1 norm', 'crisp_norm', axs=axes, plot_row=4, grid=grid)
+    generate_plots('norm1_f', 'L1 norm (fuzzy logic)', 'L1 norm', 'fuzzy_norm1', axs=axes, plot_row=1, grid=grid)
+    generate_plots('norm2_f', 'L2 norm (fuzzy logic)', 'L2 norm', 'fuzzy_norm2', axs=axes, plot_row=2, grid=grid)
+    generate_plots('sat_c', 'Satisfaction (classic logic)', 'sat', 'sat_c', axs=axes, plot_row=3, grid=grid)
+    generate_plots('n_clauses_satisfied_c', 'Proportion of satisfied clauses (classic logic)', 'n sat', 'n_clauses', axs=axes, plot_row=4, grid=grid)
+    generate_plots('norm_c', 'L1 norm (classic logic)', 'L1 norm', 'crisp_norm', axs=axes, plot_row=5, grid=grid)
 
     if grid:
         fig.savefig('plots/results.png')

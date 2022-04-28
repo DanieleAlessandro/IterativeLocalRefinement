@@ -1,3 +1,5 @@
+from typing import List
+
 from SAT_formula import SATFormula, SATLukasiewicz, SATProduct, tnorm_constructor
 from utils import *
 import os
@@ -15,12 +17,28 @@ np.random.seed(seed)
 # TODO:
 #  - NB: w diverso da lr perchè propagato nella backward invece di essere moltiplicato sui nodi
 
+def evaluate(predictions, initial_truth_values, time, filename, hyperparams: dict):
+    # Evaluation
+    sat_f, norm1_f, norm2_f = evaluate_solutions(f, predictions, initial_truth_values)
+    sat_c, norm_c, n_clauses = evaluate_solutions(f, defuzzify_list(lrl_predictions),
+                                                              defuzzify(initial_truth_values), fuzzy=False)
+
+    return (hyperparams | {  # _f: fuzzy truth values used, _c: classic logic (defuzzified)
+        'formula': filename,
+        'sat_f': sat_f,
+        'sat_c': sat_c,
+        'norm1_f': norm1_f,
+        'norm2_f': norm2_f,
+        'norm_c': norm_c,
+        'n_clauses_satisfied_c': n_clauses,
+        'time': time
+    })
+
 list_of_files = os.listdir('uf20-91')[:n_formulas]
 print(list_of_files)
 
 results_lrl = []
 results_ltn = []
-
 
 for problem_number, filename in enumerate(list_of_files):
     problem_number += 1
@@ -32,9 +50,6 @@ for problem_number, filename in enumerate(list_of_files):
     # Read knowledge
     clauses, n = parse_cnf(l, amt_rules)
 
-
-    # predicates = create_predicates(n)
-    # f_non_parallel = create_formula(predicates, clauses)
     for w in targets:
         print('Target: ' + str(w))
         w_tensor = torch.Tensor([w])
@@ -63,23 +78,13 @@ for problem_number, filename in enumerate(list_of_files):
                 # lrl = LRLModel(f_non_parallel, n_steps, t)
                 # lrl(z, method)
 
-                # Evaluation
-                lrl_sat_f, lrl_norm_f = evaluate_solutions(f, lrl_predictions, initial_truth_values)
-                lrl_sat_c, lrl_norm_c, lrl_n_clauses = evaluate_solutions(f, defuzzify_list(lrl_predictions), defuzzify(initial_truth_values), fuzzy=False)
-
-                results_lrl.append({  #_f: fuzzy truth values used, _c: classic logic (defuzzified)
-                    'formula': filename,
-                    'target': w,
+                time_cost = time.time() - start
+                print(f'LRL@{lrl_schedule}: {torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()}     Time: {time_cost}')
+                lrl_predictions.append(evaluate(lrl_predictions, initial_truth_values, time_cost, filename, {
                     'method': method,
                     'schedule': lrl_schedule,
-                    'sat_f': lrl_sat_f,
-                    'sat_c': lrl_sat_c,
-                    'norm_f': lrl_norm_f,
-                    'norm_c': lrl_norm_c,
-                    'n_clauses_satisfied_c': lrl_n_clauses
-                })
-                end = time.time()
-                print(f'LRL@{lrl_schedule}: {torch.mean(f.satisfaction(lrl_predictions[-1])).tolist()}     Time: {(end - start)}')
+                    'target': w
+                }))
 
         f = SATFormula(clauses, True, tnorm_constructor(tnorm, "mean"))
 
@@ -107,30 +112,17 @@ for problem_number, filename in enumerate(list_of_files):
             for i in range(n_steps):
                 sgd_value, _ = ltn(z)
                 s = torch.linalg.vector_norm(sgd_value - sgd_t, ord=2) + \
-                    reg_lambda * torch.linalg.vector_norm(torch.sigmoid(z) - initial_truth_values, ord=1)
+                    reg_lambda * torch.linalg.vector_norm(torch.sigmoid(z) - initial_truth_values, ord=sgd_norm)
                 s.backward()
                 optimizer.step()
                 ltn_predictions.append(torch.sigmoid(z))
+            time_cost = time.time() - start
+            print(f'LTN@{reg_lambda}: {torch.mean(f.satisfaction(ltn_predictions[-1])).tolist()}     Time: {time_cost}')
 
-            # Evaluation
-            ltn_sat_f, ltn_norm_f = evaluate_solutions(f, ltn_predictions, initial_truth_values)
-            ltn_sat_c, ltn_norm_c, ltn_n_clauses = evaluate_solutions(f,
-                                                                      defuzzify_list(ltn_predictions),
-                                                                      defuzzify(initial_truth_values), fuzzy=False)
-
-            results_ltn.append({
-                'formula': filename,
-                'target': w,
+            ltn_predictions.append(evaluate(ltn_predictions, initial_truth_values, time_cost, filename, {
                 'lambda': reg_lambda,
-                'sat_f': ltn_sat_f,
-                'sat_c': ltn_sat_c,
-                'norm_f': ltn_norm_f,
-                'norm_c': ltn_norm_c,
-                'n_clauses_satisfied_c': ltn_n_clauses
-            })
-            end = time.time()
-            print(f'LTN@{reg_lambda}: {torch.mean(f.satisfaction(ltn_predictions[-1])).tolist()}     Time: {(end - start)}')
-
+                'target': w
+            }))
 
 print('Saving results...', flush=True)
 end_time = time.time()

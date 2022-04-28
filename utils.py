@@ -1,3 +1,5 @@
+import torch.linalg
+
 from Formula import *
 from Godel import *
 from logical_layers import *
@@ -89,23 +91,25 @@ def evaluate_solutions(formula, predictions_list, initial_predictions, fuzzy=Tru
     initial value
     '''
     satisfactions = []
-    norms = []
+    norm1s = []
     if fuzzy:
+        norm2s = []
         for predictions in predictions_list:
             form_sat = formula.satisfaction(predictions)
             satisfactions.append(torch.mean(form_sat).tolist())
-            norms.append(torch.linalg.vector_norm(predictions - initial_predictions, ord=1).tolist())
+            norm1s.append(torch.linalg.vector_norm(predictions - initial_predictions, ord=1).tolist())
+            norm2s.append(torch.linalg.vector_norm(predictions - initial_predictions, ord=2).tolist())
 
-        return satisfactions, norms
+        return satisfactions, norm1s, norm2s
     else:
         n_clauses = []
 
         for predictions in predictions_list:
             satisfactions.append(torch.mean(formula.satisfaction(predictions)).tolist())
-            norms.append(torch.linalg.vector_norm(predictions - initial_predictions, ord=1).tolist())
+            norm1s.append(torch.linalg.vector_norm(predictions - initial_predictions, ord=1).tolist())
             n_clauses.append(torch.mean(formula.sat_sub_formulas(predictions)).tolist())
 
-        return satisfactions, norms, n_clauses
+        return satisfactions, norm1s, n_clauses
 
 
 class LTNModel(torch.nn.Module):
