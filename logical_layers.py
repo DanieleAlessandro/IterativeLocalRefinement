@@ -1,7 +1,7 @@
 import torch
 
 class LRL(torch.nn.Module):
-    def __init__(self, formula, max_iterations, method='mean', schedule=1.0, convergence_condition=1e-5):
+    def __init__(self, formula, max_iterations, method='mean', schedule=1.0, convergence_condition=1e-3):
         super().__init__()
         self.formula = formula
         self.schedule = schedule
@@ -16,11 +16,7 @@ class LRL(torch.nn.Module):
         for i in range(self.max_iterations):
             satisfaction = self.formula.forward(truth_values)
 
-            # delta_sat = (1. - satisfaction) * w  # TODO: which one?
-            # delta_sat = torch.where(1. - satisfaction < w, (1. - satisfaction).double(), w).float()
             # Convergence criterion has an hyperparameter. Make sure it's not too small.
-
-
             condition = (prev_satisfaction - satisfaction).abs() > self.conv_condition
             if torch.sum(condition.int()) == 0:
                 break

@@ -75,6 +75,7 @@ class SATTNorm(ABC):
             boost_max = self.boost_function_max(delta, prop_index, sign)
             if (delta < 0).any():
                 boost_min = self.boost_function_min(delta, prop_index, sign)
+                # TODO Set deltas to 0 if the delta given is 0.
                 return torch.where(cond.unsqueeze(-1), boost_max, boost_min)
             return boost_max
         return self.boost_function_min(delta, prop_index, sign)
@@ -243,7 +244,54 @@ class SATProduct(SATTNorm):
 
         return self.formula_t
 
-    def boost_function(self, delta, prop_index, sign) -> torch.Tensor:
+    def boost_function_max(self, delta, prop_index, sign) -> torch.Tensor:
+        # Compute the t-norm boost function
+        w = (self.formula_t + delta).unsqueeze(1)
+        sorted_clauses = torch.sort(self.clause_t, dim=-1, descending=True)
+        n = self.clause_t.shape[-1]
+        onez = torch.ones(self.clause_t.shape[0], 1)
+
+        # Compute the truth value lambda for each clause
+        lamd = torch.pow(
+            w / torch.cat([onez, torch.cumprod(sorted_clauses[0], dim=-1)], dim=-1),
+            1 / (n - torch.arange(0, n+1).unsqueeze(0)))
+
+        # OLD CODE: This should compute the same thing but is slower
+        # # Choose the right value lambda depending on what values exceed it
+        # cond = lamd < torch.cat([onez, sorted_clauses[0]], dim=-1)
+        # i_lambda = torch.argmax(cond.float() - torch.roll(cond.float(), -1, -1), dim=-1)
+        # i_lambda[cond.all(dim=-1)] = n - 1
+        # chosen_lambdas = torch.gather(lamd, -1, i_lambda.unsqueeze(-1))
+        # # We choose cond[..., 1:] because the first value is always 1
+        # delta_sorted_clauses = torch.where(cond[..., 1:], torch.tensor(0.0), chosen_lambdas - sorted_clauses[0])
+        # delta_clauses = torch.scatter_reduce(delta_sorted_clauses, -1, sorted_clauses[1], 'sum')
+
+        # NEW CODE: Apparently, the smallest lambda finds exactly the same as i_lambda in the previous snippet
+        # We don't have a proof for this but it works...
+        chosen_lambdas = torch.min(lamd, dim=-1, keepdim=True)[0]
+        delta_clauses = torch.where(self.clause_t < chosen_lambdas, chosen_lambdas - self.clause_t, torch.tensor(0.0))
+
+        # Compute the t-conorm boost function
+        clauses_w = self.clause_t + delta_clauses
+        # Note: This code is equal to that of the Godel!
+        max_literals = self.indexed_t.max(dim=-1)
+        max_indices = max_literals[1].unsqueeze(-1)
+        # Computes the delta for the t-conorm boost function
+        # We multiply here with 1 - max_literals so that it is excluded from the division
+        # TODO: What if the divisor approaches 0 if the clause is almost satisfied?
+        delta_divisor = (1 - max_literals[0]) * (1-clauses_w) / (torch.prod(1 - self.indexed_t, dim=-1) + 1e-10)
+        delta_max_literal = (1 - max_literals[0] - delta_divisor
+                             ) * torch.take_along_dim(sign.unsqueeze(0), max_indices, -1).squeeze()
+
+        # Find what propositions the results belong to
+        propositions_max_indices = torch.take_along_dim(prop_index.unsqueeze(0), max_indices, -1).squeeze()
+
+        prop_deltas = aggregate(delta_max_literal, propositions_max_indices, self.aggregate_func)
+
+        return prop_deltas
+
+    def boost_function_min(self, delta, prop_index, sign) -> torch.Tensor:
+        # TODO
         # Compute the t-norm boost function
         w = (self.formula_t + delta).unsqueeze(1)
         sorted_clauses = torch.sort(self.clause_t, dim=-1, descending=True)
