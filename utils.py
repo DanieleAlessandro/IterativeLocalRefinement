@@ -35,7 +35,7 @@ def parse_cnf(in_data, amt_rules: int):
     return cnf, number_of_variables
 
 
-def initialize_pre_activations(number_of_variables, number_of_trials):
+def initialize_pre_activations(number_of_variables, number_of_trials, device):
     """Initialize pre-activations for both LTN and LRL (same initial value)
 
     :param number_of_variables: number of propositions
@@ -43,6 +43,7 @@ def initialize_pre_activations(number_of_variables, number_of_trials):
     """
     t = torch.rand([number_of_trials, number_of_variables])
     z = torch.logit(t)
+    z.to(device)
 
     yield z
     while True:

@@ -34,6 +34,10 @@ def evaluate(formula, predictions, initial_truth_values, time, hyperparams: dict
     })
 
 list_of_files = os.listdir('uf20-91')[:n_formulas]
+
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+print(device)
+
 if verbose:
     print(list_of_files)
 
@@ -58,6 +62,9 @@ for amt_rulez in amt_rules:
 
         time_problem_start = time.time()
 
+        f = SATFormula(clauses)
+        f.to(device)
+
         for w in targets:
             if verbose:
                 print('Target: ' + str(w))
@@ -66,7 +73,7 @@ for amt_rulez in amt_rules:
             # Generate initial random pre-activations
             # The initialize_pre_activations first returns a not learnable tensor (used by LRL), from
             # the second next it returns the same exact value as a new learnable parameter (used by LTN)
-            generator = initialize_pre_activations(n, n_initial_vectors)
+            generator = initialize_pre_activations(n, n_initial_vectors, device)
 
             initial_truth_values = torch.sigmoid(next(generator))
 
@@ -80,7 +87,8 @@ for amt_rulez in amt_rules:
             }
 
             for method in methods:
-                f = SATFormula(clauses, False, tnorm_constructor(tnorm, method))
+                f.is_sgd = False
+                f.tnorm = tnorm_constructor(tnorm, method)
                 for lrl_schedule in lrl_schedules:
                     start = time.time()
 
@@ -104,8 +112,7 @@ for amt_rulez in amt_rules:
                         'schedule': lrl_schedule,
                     }))
 
-            f = SATFormula(clauses, True, tnorm_constructor(tnorm, "mean"))
-
+            f.is_sgd = True
             # ========================================== SGD ==========================================
             for reg_lambda in regularization_lambda_list:
                 start = time.time()
@@ -141,7 +148,7 @@ for amt_rulez in amt_rules:
                 results_ltn.append(evaluate(f, ltn_predictions, initial_truth_values, time_cost, base_dict | {
                     'lambda': reg_lambda,
                 }))
-        print('Problem took {} seconds'.format(time.time() - time_problem_start))
+        print('Problem took {} seconds'.format(time.time() - time_problem_start), flush=True)
 
     print('Saving results...', flush=True)
     end_time = time.time()

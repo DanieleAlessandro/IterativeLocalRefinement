@@ -346,14 +346,15 @@ class SATProduct(SATTNorm):
 
 
 class SATFormula(Formula):
-    def __init__(self, clauses, is_sgd=False, tnorm=SATGodel("mean")):
+    def __init__(self, clauses):
+        super().__init__([])
         self.clause_t = None
-        self.is_sgd = is_sgd
+        self.is_sgd = None
         formula_tensor = torch.tensor(clauses)
         self.prop_index = formula_tensor.abs() - 1
         # self.prop_index = formula_tensor.abs()
         self.sign = formula_tensor.sign()
-        self.tnorm = tnorm
+        self.tnorm = None
 
     def function(self, indexed_t) -> torch.Tensor:
         self.input_tensor = indexed_t

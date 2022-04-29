@@ -5,8 +5,9 @@ from prettytable import PrettyTable
 import random
 
 
-class Formula:
+class Formula(torch.nn.Module):
     def __init__(self, sub_formulas):
+        super().__init__()
         if sub_formulas is not None:
             self.sub_formulas = sub_formulas
             self.predicates = list(set([p for sf in self.sub_formulas for p in sf.predicates]))
