@@ -15,6 +15,7 @@ regularization_lambda_list = [0.5, 0.1, 0.01, 0.0]  # regularization hyperparame
 lrl_schedules = [1.0, 0.1] # The scheduling on the delta of LRL
 
 verbose = True
+use_cuda = False
 
 # Plotting
 amt_rules_plot = 10

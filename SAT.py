@@ -35,7 +35,8 @@ def evaluate(formula, predictions, initial_truth_values, time, hyperparams: dict
 
 list_of_files = os.listdir('uf20-91')[:n_formulas]
 
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+# device = torch.cuda.device(torch.cuda.current_device()) if torch.cuda.is_available() else torch.device("cpu")
+device = torch.device("cuda") if use_cuda and torch.cuda.is_available() else torch.device("cpu")
 print(device)
 
 if verbose:
@@ -62,13 +63,13 @@ for amt_rulez in amt_rules:
 
         time_problem_start = time.time()
 
-        f = SATFormula(clauses)
-        f.to(device)
+        f = SATFormula(clauses, device)
+        # f.to(device)
 
         for w in targets:
             if verbose:
                 print('Target: ' + str(w))
-            w_tensor = torch.Tensor([w])
+            w_tensor = torch.tensor([w], device=device)
 
             # Generate initial random pre-activations
             # The initialize_pre_activations first returns a not learnable tensor (used by LRL), from

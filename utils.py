@@ -41,9 +41,9 @@ def initialize_pre_activations(number_of_variables, number_of_trials, device):
     :param number_of_variables: number of propositions
     :param number_of_trials: number of different initial truth values
     """
-    t = torch.rand([number_of_trials, number_of_variables])
+    t = torch.rand([number_of_trials, number_of_variables], device=device)
     z = torch.logit(t)
-    z.to(device)
+    # z.to(device=device)
 
     yield z
     while True:

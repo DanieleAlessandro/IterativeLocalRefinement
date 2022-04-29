@@ -4,22 +4,23 @@ import torch
 from abc import ABC, abstractmethod
 
 from Formula import Formula
+from torch_scatter import scatter_max, scatter_min, scatter_sum
 
 def aggregate_mean(delta_literals: torch.Tensor, prop_index: torch.Tensor, props=20) -> torch.Tensor:
     # Uses the mean to combine the deltas on the same proposition
     # How to compute the mean on nonzero values: Take the sum (scatter_add), then count amount of nonzero values
-    prop_deltas = torch.scatter_reduce(delta_literals, -1, prop_index, 'sum', output_size=props)
+    prop_deltas = scatter_sum(delta_literals, prop_index, -1, dim_size=props)[0]
 
     # Check what values are nonzero (or not almost zero)
-    amt_nonzero = torch.scatter_reduce((torch.abs(delta_literals) > 1e-6).float(), -1, prop_index, 'sum', output_size=props)
+    amt_nonzero = scatter_sum((torch.abs(delta_literals) > 1e-6).float(), prop_index, -1, dim_size=props)[0]
     mask = amt_nonzero > 0
     prop_deltas[mask] = prop_deltas[mask] / amt_nonzero[mask]
     return prop_deltas
 
 def aggregate_max(delta_literals: torch.Tensor, prop_index: torch.Tensor, randomized=False, props=20) -> torch.Tensor:
     # Uses the absolute max value to combine the deltas on the same proposition
-    prop_deltas_max = torch.scatter_reduce(delta_literals, -1, prop_index, 'amax', output_size=props)
-    prop_deltas_min = torch.scatter_reduce(delta_literals, -1, prop_index, 'amin', output_size=props)
+    prop_deltas_max = scatter_max(delta_literals, prop_index, -1, dim_size=props)[0]
+    prop_deltas_min = scatter_min(delta_literals, prop_index, -1, dim_size=props)[0]
     if randomized:
         prob = torch.sigmoid((prop_deltas_max.abs() - prop_deltas_min.abs())/0.01)
         prop_deltas = torch.where(torch.bernoulli(prob).bool(), prop_deltas_max, prop_deltas_min)
@@ -30,12 +31,12 @@ def aggregate_max(delta_literals: torch.Tensor, prop_index: torch.Tensor, random
 
 def aggregate_min(delta_literals: torch.Tensor, prop_index: torch.Tensor, threshold=0.01, props=20) -> torch.Tensor:
     # Uses the absolute min values, among values larger than threshold, to combine the deltas on the same proposition
-    prop_deltas_max = torch.scatter_reduce(
+    prop_deltas_max = scatter_max(
         delta_literals * (delta_literals < -threshold) - (delta_literals >= -threshold).float(),
-        -1, prop_index, 'amax', output_size=props)
-    prop_deltas_min = torch.scatter_reduce(
+        prop_index, -1, dim_size=props)[0]
+    prop_deltas_min = scatter_min(
         delta_literals * (delta_literals >  threshold) + (delta_literals <=  threshold).float(),
-        -1, prop_index, 'amin', output_size=props)
+        prop_index, -1, dim_size=props)[0]
     prop_deltas = torch.where(prop_deltas_max.abs() < prop_deltas_min.abs(), prop_deltas_max, prop_deltas_min)
     prop_deltas[prop_deltas == 1] = 0
     prop_deltas[prop_deltas == -1] = 0
@@ -50,7 +51,7 @@ def aggregate(delta_literals: torch.Tensor, prop_index: torch.Tensor, method: st
         return aggregate_min(delta_literals, prop_index, **kwargs)
 
 
-def tnorm_constructor(tnorm: str, aggregate_func, props=20):
+def tnorm_constructor(tnorm: str, aggregate_func):
     if tnorm == 'godel':
         return SATGodel(aggregate_func )
     elif tnorm == 'lukasiewicz':
@@ -172,7 +173,7 @@ class SATLukasiewicz(SATTNorm):
 
         # Assign the respective deltas to the clause truth values
         delta_sorted_clauses = torch.where(cond, delta_M_star, 1 - sorted_clauses[0])
-        delta_clauses = torch.scatter_reduce(delta_sorted_clauses, -1, sorted_clauses[1], 'sum')
+        delta_clauses = scatter_sum(delta_sorted_clauses, sorted_clauses[1], -1)[0]
         # if not (delta_clauses_new == delta_clauses).all():
         #    i = 0
 
@@ -214,7 +215,7 @@ class SATLukasiewicz(SATTNorm):
 
         # Assign the respective deltas to the clause truth values
         delta_sorted_literals = torch.where(cond, -delta_M_star, -sorted_literals[0])
-        delta_literals = torch.scatter_reduce(delta_sorted_literals, -1, sorted_literals[1], 'sum')
+        delta_literals = scatter_sum(delta_sorted_literals, sorted_literals[1], -1)[0]
 
         # Distribute the deltas over the propositions using the mean aggregation
         prop_index_expand = prop_index.unsqueeze(0).expand(delta_literals.shape).flatten(1, 2)
@@ -346,11 +347,11 @@ class SATProduct(SATTNorm):
 
 
 class SATFormula(Formula):
-    def __init__(self, clauses):
+    def __init__(self, clauses, device):
         super().__init__([])
         self.clause_t = None
         self.is_sgd = None
-        formula_tensor = torch.tensor(clauses)
+        formula_tensor = torch.tensor(clauses, device=device)
         self.prop_index = formula_tensor.abs() - 1
         # self.prop_index = formula_tensor.abs()
         self.sign = formula_tensor.sign()
