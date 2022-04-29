@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 from settings import *
 import os
 
-with open('results_lrl', 'rb') as f:
+with open(f'results/{tnorm_plot}/lrl_{amt_rules_plot}_rules', 'rb') as f:
     results_lrl = pickle.load(f)
 
-with open('results_ltn', 'rb') as f:
+with open(f'results/{tnorm_plot}/ltn_{amt_rules_plot}_rules', 'rb') as f:
     results_ltn = pickle.load(f)
 
 
-def generate_plots(key, title, y_label, file_name, axs=None, plot_row=None, grid=True):
+def generate_plots(key, title, y_label, file_name, basepath, axs=None, plot_row=None, grid=True):
     if not grid:
         plt.rcParams["figure.figsize"] = (8.5, 5)
         plt.title(title)
@@ -55,13 +55,18 @@ def generate_plots(key, title, y_label, file_name, axs=None, plot_row=None, grid
             axs[plot_row, plot_column].set_title(title)
         else:
             plt.legend(bbox_to_anchor=(1.45, 0.9), loc='upper right')
-            plt.savefig('plots/' + 'w_' + str(t) + '/'+ file_name + '.png', bbox_inches="tight")
+            plt.savefig(f'{basepath}/w_{t}/{file_name}.png', bbox_inches="tight")
             plt.close()
 
 
+if not os.path.exists(f'plots/{tnorm_plot}'):
+    os.makedirs(f'plots/{tnorm_plot}')
+base_path = f'plots/{tnorm_plot}/{amt_rules_plot}_rules'
+if not os.path.exists(base_path):
+    os.makedirs(base_path)
 for t in targets:
-    if not os.path.exists('plots/w_' + str(t)):
-        os.mkdir('plots/w_' + str(t))
+    if not os.path.exists(f'{base_path}/w_{t}'):
+        os.mkdir(f'{base_path}/w_{t}')
 
 def create_figures(grid):
     if grid:
@@ -71,15 +76,15 @@ def create_figures(grid):
     else:
         axes = None
 
-    generate_plots('sat_f', 'Satisfaction (fuzzy logic)', 'fuzzy sat', 'sat_f', axs=axes, plot_row=0, grid=grid)
-    generate_plots('norm1_f', 'L1 norm (fuzzy logic)', 'L1 norm', 'fuzzy_norm1', axs=axes, plot_row=1, grid=grid)
-    generate_plots('norm2_f', 'L2 norm (fuzzy logic)', 'L2 norm', 'fuzzy_norm2', axs=axes, plot_row=2, grid=grid)
-    generate_plots('sat_c', 'Satisfaction (classic logic)', 'sat', 'sat_c', axs=axes, plot_row=3, grid=grid)
-    generate_plots('n_clauses_satisfied_c', 'Proportion of satisfied clauses (classic logic)', 'n sat', 'n_clauses', axs=axes, plot_row=4, grid=grid)
-    generate_plots('norm_c', 'L1 norm (classic logic)', 'L1 norm', 'crisp_norm', axs=axes, plot_row=5, grid=grid)
+    generate_plots('sat_f', 'Satisfaction (fuzzy logic)', 'fuzzy sat', 'sat_f', base_path, axs=axes, plot_row=0, grid=grid)
+    generate_plots('norm1_f', 'L1 norm (fuzzy logic)', 'L1 norm', 'fuzzy_norm1', base_path, axs=axes, plot_row=1, grid=grid)
+    generate_plots('norm2_f', 'L2 norm (fuzzy logic)', 'L2 norm', 'fuzzy_norm2', base_path, axs=axes, plot_row=2, grid=grid)
+    generate_plots('sat_c', 'Satisfaction (classic logic)', 'sat', 'sat_c', base_path, axs=axes, plot_row=3, grid=grid)
+    generate_plots('n_clauses_satisfied_c', 'Proportion of satisfied clauses (classic logic)', 'n sat', 'n_clauses', base_path, axs=axes, plot_row=4, grid=grid)
+    generate_plots('norm_c', 'L1 norm (classic logic)', 'L1 norm', 'crisp_norm', base_path, axs=axes, plot_row=5, grid=grid)
 
     if grid:
-        fig.savefig('plots/results.png')
+        fig.savefig(f'plots/results_{tnorm_plot}_{amt_rules_plot}.png')
         plt.close()
 
 create_figures(False)
