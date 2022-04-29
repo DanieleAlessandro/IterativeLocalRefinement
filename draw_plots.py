@@ -79,7 +79,7 @@ def create_figures(grid, base_path, tnorm, amt_rulez):
         plt.close()
 
 for amt_rulez in amt_rules:
-    for tnorm in ['product', 'godel', 'lukasiewicz']:
+    for tnorm in tnorms_plot:
         if not os.path.exists(f'results/{tnorm}/lrl_{amt_rulez}_rules'):
             continue
         if not os.path.exists(f'plots/{tnorm}'):
