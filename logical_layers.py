@@ -23,13 +23,15 @@ class LRL(torch.nn.Module):
 
             # TODO: What about this weird parameter here? It seems to really smooth out the trajectory
             # delta_sat = torch.where(target - satisfaction > 0, (target - satisfaction).double(), 0.).float() * self.schedule
+            ignore_mask = (w - satisfaction).abs() > self.conv_condition
             delta_sat = torch.where(
-                (w - satisfaction).abs() > self.conv_condition,
+                ignore_mask,
                 (w - satisfaction).double() * self.schedule,
                 0.).float()
 
             self.formula.backward(delta_sat)
             delta_tensor = self.formula.get_delta_tensor(truth_values, self.method)
+            delta_tensor[~ignore_mask] = torch.zeros((delta_tensor.shape[-1]))
 
             # The clip function is called to remove numeric errors (small negative values)
             truth_values = torch.clip(truth_values + delta_tensor, min=0.0, max=1.0)

@@ -1,12 +1,12 @@
 # Fixed settings
 n_initial_vectors = 10
 n_steps = 300
-n_formulas = 1000
+n_formulas = 10
 
-amt_rules = [10, 20, 30, 40, 50, 60, 70, 80, 91] # Max is 91 [10, 20, 30, 40, 50, 60, 70, 80, 91]
+amt_rules = [10, 91] # Max is 91 [10, 20, 30, 40, 50, 60, 70, 80, 91]
 
 # Hyper parameters
-tnorm = 'godel' # Choose from 'godel', 'lukasiewicz', 'product'
+tnorm = 'lukasiewicz' # Choose from 'godel', 'lukasiewicz', 'product'
 sgd_norm = 1 if tnorm == 'product' else 2
 targets = [0.3, 0.5, 0.8, 1.0]  # list of target truth values for both LRL and LTN
 methods = ['mean', "max"]  # list of aggregation methods for LRL
@@ -19,4 +19,4 @@ use_cuda = False
 
 # Plotting
 amt_rules_plot = 10
-tnorm_plot = tnorm
+tnorms_plot = ["product", "lukasiewicz", "godel"]
