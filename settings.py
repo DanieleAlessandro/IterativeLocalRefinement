@@ -3,7 +3,7 @@ n_initial_vectors = 10
 n_steps = 300
 n_formulas = 1000
 
-amt_rules = [10] # Max is 91 [10, 20, 30, 40, 50, 60, 70, 80, 91]
+amt_rules = [10, 20, 30, 40, 50, 60, 70, 80, 91] # Max is 91 [10, 20, 30, 40, 50, 60, 70, 80, 91]
 
 # Hyper parameters
 tnorm = 'godel' # Choose from 'godel', 'lukasiewicz', 'product'

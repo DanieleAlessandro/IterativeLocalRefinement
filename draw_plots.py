@@ -4,11 +4,7 @@ import matplotlib.pyplot as plt
 from settings import *
 import os
 
-with open(f'results/{tnorm_plot}/lrl_{amt_rules_plot}_rules', 'rb') as f:
-    results_lrl = pickle.load(f)
 
-with open(f'results/{tnorm_plot}/ltn_{amt_rules_plot}_rules', 'rb') as f:
-    results_ltn = pickle.load(f)
 
 
 def generate_plots(key, title, y_label, file_name, basepath, axs=None, plot_row=None, grid=True):
@@ -58,17 +54,12 @@ def generate_plots(key, title, y_label, file_name, basepath, axs=None, plot_row=
             plt.savefig(f'{basepath}/w_{t}/{file_name}.png', bbox_inches="tight")
             plt.close()
 
+results_lrl = None
+results_ltn = None
 
-if not os.path.exists(f'plots/{tnorm_plot}'):
-    os.makedirs(f'plots/{tnorm_plot}')
-base_path = f'plots/{tnorm_plot}/{amt_rules_plot}_rules'
-if not os.path.exists(base_path):
-    os.makedirs(base_path)
-for t in targets:
-    if not os.path.exists(f'{base_path}/w_{t}'):
-        os.mkdir(f'{base_path}/w_{t}')
 
-def create_figures(grid):
+
+def create_figures(grid, base_path, tnorm, amt_rulez):
     if grid:
         plt.rcParams["figure.figsize"] = (28, 20)
         plt.subplots_adjust(right=0.7)
@@ -84,11 +75,33 @@ def create_figures(grid):
     generate_plots('norm_c', 'L1 norm (classic logic)', 'L1 norm', 'crisp_norm', base_path, axs=axes, plot_row=5, grid=grid)
 
     if grid:
-        fig.savefig(f'plots/results_{tnorm_plot}_{amt_rules_plot}.png')
+        fig.savefig(f'plots/results_{tnorm}_{amt_rulez}.png')
         plt.close()
 
-create_figures(False)
-create_figures(True)
+for amt_rulez in amt_rules:
+    for tnorm in ['product', 'godel', 'lukasiewicz']:
+        if not os.path.exists(f'results/{tnorm}/lrl_{amt_rulez}_rules'):
+            continue
+        if not os.path.exists(f'plots/{tnorm}'):
+            os.makedirs(f'plots/{tnorm}')
+        base_path = f'plots/{tnorm}/{amt_rulez}_rules'
+        if not os.path.exists(base_path):
+            os.makedirs(base_path)
+        for t in targets:
+            if not os.path.exists(f'{base_path}/w_{t}'):
+                os.mkdir(f'{base_path}/w_{t}')
+
+        with open(f'results/{tnorm}/lrl_{amt_rulez}_rules', 'rb') as f:
+            results_lrl = pickle.load(f)
+
+        with open(f'results/{tnorm}/ltn_{amt_rulez}_rules', 'rb') as f:
+            results_ltn = pickle.load(f)
+
+        create_figures(False, base_path, tnorm, amt_rulez)
+        create_figures(True, base_path, tnorm, amt_rulez)
+
+
+
 # row_labels = ['a','c','x','x','x']
 # column_labels = ['zaza', 'c','x','x']
 
