@@ -69,7 +69,7 @@ for problem_number, filename in enumerate(list_of_files):
                 # ========================================== LRL ==========================================
 
                 # Define the model
-                lrl = LRL(f, n_steps, lrl_schedule)
+                lrl = LRL(f, n_steps, schedule=lrl_schedule)
 
                 # Optimization
                 lrl_predictions = lrl(initial_truth_values, w)
@@ -136,11 +136,5 @@ with open('results_ltn', 'wb') as f:
     pickle.dump(results_ltn, f)
 
 # TODO:
-#  - check all TODOs and debug
 #  - standard deviation over all problems??
-#  DONE:
-#  - run it twice and check if the results are exactly the same (check the seed)
-#  - dump results_ltn and results_lrl
-#  - mean over all problems
-#  - dump mean results
-#  - plots
+

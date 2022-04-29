@@ -68,8 +68,23 @@ class SATTNorm(ABC):
     def forward(self, indexed_t: torch.Tensor) -> torch.Tensor:
         pass
 
-    @abstractmethod
     def boost_function(self, delta: torch.Tensor, prop_index: torch.Tensor, sign: torch.Tensor) -> torch.Tensor:
+        cond = delta > 0
+        require_max = cond.any()
+        if require_max:
+            boost_max = self.boost_function_max(delta, prop_index, sign)
+            if (delta < 0).any():
+                boost_min = self.boost_function_min(delta, prop_index, sign)
+                return torch.where(cond.unsqueeze(-1), boost_max, boost_min)
+            return boost_max
+        return self.boost_function_min(delta, prop_index, sign)
+
+    @abstractmethod
+    def boost_function_min(self, delta: torch.Tensor, prop_index: torch.Tensor, sign: torch.Tensor) -> torch.Tensor:
+        pass
+
+    @abstractmethod
+    def boost_function_max(self, delta: torch.Tensor, prop_index: torch.Tensor, sign: torch.Tensor) -> torch.Tensor:
         pass
 
     def sgd_function(self, indexed_t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -87,18 +102,6 @@ class SATGodel(SATTNorm):
         self.clause_t = self.clause_t_g[0]
         self.formula_t = torch.min(self.clause_t, dim=1)[0]
         return self.formula_t
-
-    def boost_function(self, delta, prop_index, sign) -> torch.Tensor:
-        cond = delta > 0
-        require_max = cond.any()
-        if require_max:
-            boost_max = self.boost_function_max(delta, prop_index, sign)
-            if (delta < 0).any():
-                boost_min = self.boost_function_min(delta, prop_index, sign)
-                return torch.where(cond.unsqueeze(-1), boost_max, boost_min)
-            return boost_max
-        return self.boost_function_min(delta, prop_index, sign)
-
 
     def boost_function_max(self, delta, prop_index, sign) -> torch.Tensor:
         w_min = (self.formula_t + delta).unsqueeze(1)
@@ -141,7 +144,7 @@ class SATLukasiewicz(SATTNorm):
         self.formula_t = torch.clip(torch.sum(self.clause_t, dim=-1) - (n-1), 0, 1)
         return self.formula_t
 
-    def boost_function(self, delta, prop_index, sign) -> torch.Tensor:
+    def boost_function_max(self, delta, prop_index, sign) -> torch.Tensor:
         # Compute the t-norm boost function
         w = (self.formula_t + delta).unsqueeze(1)
         n = self.clause_t.shape[-1]
@@ -151,6 +154,11 @@ class SATLukasiewicz(SATTNorm):
         M = torch.arange(1, n+1)
         delta_M = (w + M - 1 - torch.cumsum(sorted_clauses[0], dim=-1)) / M
 
+        # TODO: This is _usually_ the same as the code below, except it sometimes makes mistakes especially for w=1
+        # delta_M_star = torch.max(delta_M, dim=-1, keepdim=True)
+        # delta_clauses_new = torch.where(1 - self.clause_t > delta_M_star[0], delta_M_star[0], 1 - self.clause_t)
+        # M_star_new = delta_M_star[1].squeeze(-1)
+
         cond = delta_M < 1 - sorted_clauses[0]
         # Do cond - cond (shifted to the left), then take the argmax.
         # This finds the largest index for which the condition is true
@@ -158,14 +166,54 @@ class SATLukasiewicz(SATTNorm):
         # If the condition holds for all clauses, then the max index is the last one
         M_star[cond.all(dim=-1)] = n - 1
         delta_M_star = torch.gather(delta_M, -1, M_star.unsqueeze(-1))
+        # if not (torch.logical_or(M_star == M_star_new, delta_M_star[0].squeeze(-1) < 0)).all():
+        #    i = 0
 
         # Assign the respective deltas to the clause truth values
-        delta_sorted_clauses = torch.where(cond, delta_M_star, torch.tensor(0.0))
+        delta_sorted_clauses = torch.where(cond, delta_M_star, 1 - sorted_clauses[0])
         delta_clauses = torch.scatter_reduce(delta_sorted_clauses, -1, sorted_clauses[1], 'sum')
+        # if not (delta_clauses_new == delta_clauses).all():
+        #    i = 0
 
         # Compute the t-conorm boost function
         clauses_w = self.clause_t + delta_clauses
         delta_literals = (torch.clip(clauses_w - torch.sum(self.indexed_t, dim=-1), 0, 1) / 3.0).unsqueeze(-1) * sign
+
+        # Distribute the deltas over the propositions using the mean aggregation
+        prop_index_expand = prop_index.unsqueeze(0).expand(delta_literals.shape).flatten(1, 2)
+        delta_literals_flat = delta_literals.flatten(1, 2)
+        prop_deltas = aggregate(delta_literals_flat, prop_index_expand, self.aggregate_func)
+
+        return prop_deltas
+
+    def boost_function_min(self, delta, prop_index, sign) -> torch.Tensor:
+        # Compute the t-norm boost function
+        w = self.formula_t + delta
+        n = self.clause_t.shape[-1]
+        delta_clauses = torch.clip(w - 1 + n - torch.sum(self.clause_t, dim=-1), 0, 1) / n
+        w_clauses = self.clause_t + delta_clauses.unsqueeze(-1)
+
+        sorted_literals = torch.sort(self.indexed_t, dim=-1, descending=True)
+        n_literals = self.indexed_t[0].shape[-1]
+        # Find the delta_M for each M
+        M = torch.arange(1, n_literals+1).unsqueeze(0).unsqueeze(0)
+        delta_M = (torch.cumsum(sorted_literals[0], dim=-1) - w_clauses.unsqueeze(-1)) / M
+        # delta_M_star = torch.max(delta_M, dim=-1)[0].unsqueeze(-1)
+        #
+        # delta_literals = torch.where(self.indexed_t < delta_M_star, -delta_M_star, -self.indexed_t) * sign
+
+        cond = delta_M < sorted_literals[0]
+        # Do cond - cond (shifted to the left), then take the argmax.
+        # This finds the largest index for which the condition is true
+        M_star = torch.argmax(cond.float() - torch.roll(cond.float(), -1, -1), dim=-1)
+        # If the condition holds for all literals, then the max index is the last one
+        # TODO: Check this... Seems like it happens frequently
+        M_star[cond.all(dim=-1)] = n_literals - 1
+        delta_M_star = torch.gather(delta_M, -1, M_star.unsqueeze(-1))
+
+        # Assign the respective deltas to the clause truth values
+        delta_sorted_literals = torch.where(cond, -delta_M_star, -sorted_literals[0])
+        delta_literals = torch.scatter_reduce(delta_sorted_literals, -1, sorted_literals[1], 'sum')
 
         # Distribute the deltas over the propositions using the mean aggregation
         prop_index_expand = prop_index.unsqueeze(0).expand(delta_literals.shape).flatten(1, 2)
