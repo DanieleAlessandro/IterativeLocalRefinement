@@ -9,10 +9,10 @@ from torch_scatter import scatter_max, scatter_min, scatter_sum
 def aggregate_mean(delta_literals: torch.Tensor, prop_index: torch.Tensor, props=20) -> torch.Tensor:
     # Uses the mean to combine the deltas on the same proposition
     # How to compute the mean on nonzero values: Take the sum (scatter_add), then count amount of nonzero values
-    prop_deltas = scatter_sum(delta_literals, prop_index, -1, dim_size=props)[0]
+    prop_deltas = scatter_sum(delta_literals, prop_index, -1, dim_size=props)
 
     # Check what values are nonzero (or not almost zero)
-    amt_nonzero = scatter_sum((torch.abs(delta_literals) > 1e-6).float(), prop_index, -1, dim_size=props)[0]
+    amt_nonzero = scatter_sum((torch.abs(delta_literals) > 1e-6).float(), prop_index, -1, dim_size=props)
     mask = amt_nonzero > 0
     prop_deltas[mask] = prop_deltas[mask] / amt_nonzero[mask]
     return prop_deltas
@@ -173,7 +173,7 @@ class SATLukasiewicz(SATTNorm):
 
         # Assign the respective deltas to the clause truth values
         delta_sorted_clauses = torch.where(cond, delta_M_star, 1 - sorted_clauses[0])
-        delta_clauses = scatter_sum(delta_sorted_clauses, sorted_clauses[1], -1)[0]
+        delta_clauses = scatter_sum(delta_sorted_clauses, sorted_clauses[1], -1)
         # if not (delta_clauses_new == delta_clauses).all():
         #    i = 0
 
@@ -215,7 +215,7 @@ class SATLukasiewicz(SATTNorm):
 
         # Assign the respective deltas to the clause truth values
         delta_sorted_literals = torch.where(cond, -delta_M_star, -sorted_literals[0])
-        delta_literals = scatter_sum(delta_sorted_literals, sorted_literals[1], -1)[0]
+        delta_literals = scatter_sum(delta_sorted_literals, sorted_literals[1], -1)
 
         # Distribute the deltas over the propositions using the mean aggregation
         prop_index_expand = prop_index.unsqueeze(0).expand(delta_literals.shape).flatten(1, 2)
