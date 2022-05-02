@@ -84,6 +84,7 @@ for problem_number, filename in enumerate(list_of_files):
 
             ltn_predictions = [torch.sigmoid(z)]
             for i in range(n_steps):
+                optimizer.zero_grad()
                 s = torch.linalg.vector_norm(ltn(z) - t_tensor, ord=2) + \
                     reg_lambda * torch.linalg.vector_norm(torch.sigmoid(z) - initial_truth_values, ord=1)
                 s.backward()
