@@ -179,7 +179,7 @@ class SATLukasiewicz(SATTNorm):
 
         # Compute the t-conorm boost function
         clauses_w = self.clause_t + delta_clauses
-        delta_literals = (torch.clip(clauses_w - torch.sum(self.indexed_t, dim=-1), 0, 1) / 3.0).unsqueeze(-1) * sign
+        delta_literals = (torch.clip(clauses_w - torch.sum(self.indexed_t, dim=-1), min=0) / 3.0).unsqueeze(-1) * sign
 
         # Distribute the deltas over the propositions using the mean aggregation
         prop_index_expand = prop_index.unsqueeze(0).expand(delta_literals.shape).flatten(1, 2)
@@ -192,19 +192,21 @@ class SATLukasiewicz(SATTNorm):
         # Compute the t-norm boost function
         w = self.formula_t + delta
         n = self.clause_t.shape[-1]
-        delta_clauses = torch.clip(w - 1 + n - torch.sum(self.clause_t, dim=-1), 0, 1) / n
-        w_clauses = self.clause_t + delta_clauses.unsqueeze(-1)
+        delta_clauses = torch.clip(w - 1 + n - torch.sum(self.clause_t, dim=-1), max=0) / n
+        w_clauses = (self.clause_t + delta_clauses.unsqueeze(-1)).unsqueeze(-1)
 
         sorted_literals = torch.sort(self.indexed_t, dim=-1, descending=True)
         n_literals = self.indexed_t[0].shape[-1]
         # Find the delta_M for each M
         M = torch.arange(1, n_literals+1).unsqueeze(0).unsqueeze(0)
-        delta_M = (torch.cumsum(sorted_literals[0], dim=-1) - w_clauses.unsqueeze(-1)) / M
+        literals_sum = torch.cumsum(sorted_literals[0], dim=-1)
+        delta_M = (w_clauses - literals_sum) / M
+
         # delta_M_star = torch.max(delta_M, dim=-1)[0].unsqueeze(-1)
         #
         # delta_literals = torch.where(self.indexed_t < delta_M_star, -delta_M_star, -self.indexed_t) * sign
 
-        cond = delta_M < sorted_literals[0]
+        cond = delta_M > -sorted_literals[0]
         # Do cond - cond (shifted to the left), then take the argmax.
         # This finds the largest index for which the condition is true
         M_star = torch.argmax(cond.float() - torch.roll(cond.float(), -1, -1), dim=-1)

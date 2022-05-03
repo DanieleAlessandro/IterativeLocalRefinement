@@ -114,41 +114,50 @@ for amt_rulez in amt_rules:
                     }))
 
             f.is_sgd = True
+            f.tnorm = tnorm_constructor(tnorm, 'mean')
             # ========================================== SGD ==========================================
-            for reg_lambda in regularization_lambda_list:
-                start = time.time()
+            for sgd_method in sgd_methods:
+                for reg_lambda in regularization_lambda_list:
+                    start = time.time()
 
-                # Generate initial random pre-activations
-                z = next(generator)
+                    # Generate initial random pre-activations
+                    z = next(generator)
 
-                # Define the model
-                ltn = LTNModel(f)
+                    # Define the model
+                    ltn = LTNModel(f)
 
-                # LTN optimization
-                optimizer = torch.optim.SGD([z], lr=0.1)
+                    # LTN optimization
+                    if sgd_method == 'sgd':
+                        optimizer = torch.optim.SGD([z], lr=0.1)
+                    elif sgd_method == 'adam':
+                        optimizer = torch.optim.Adam([z], lr=0.1)
+                    elif sgd_method == 'sgd_momentum':
+                        optimizer = torch.optim.Adagrad([z], lr=0.1)
 
-                ltn_predictions = [torch.sigmoid(z)]
+                    ltn_predictions = [torch.sigmoid(z)]
 
-                # TODO: This needs to be made generic
-                if tnorm == "product":
-                    sgd_t = w_tensor.log()
-                else:
-                    sgd_t = w_tensor
+                    # TODO: This needs to be made generic
+                    if tnorm == "product":
+                        sgd_t = w_tensor.log()
+                    else:
+                        sgd_t = w_tensor
 
-                for i in range(n_steps):
-                    sgd_value, _ = ltn(z)
-                    s = torch.linalg.vector_norm(sgd_value - sgd_t, ord=2) + \
-                        reg_lambda * torch.linalg.vector_norm(torch.sigmoid(z) - initial_truth_values, ord=sgd_norm)
-                    s.backward()
-                    optimizer.step()
-                    ltn_predictions.append(torch.sigmoid(z))
-                time_cost = time.time() - start
-                if verbose:
-                    print(f'LTN@{reg_lambda}: {torch.mean(f.satisfaction(ltn_predictions[-1])).tolist()}     Time: {time_cost}')
+                    for i in range(n_steps):
+                        optimizer.zero_grad()
+                        sgd_value, _ = ltn(z)
+                        s = torch.linalg.vector_norm(sgd_value - sgd_t, ord=2) + \
+                            reg_lambda * torch.linalg.vector_norm(torch.sigmoid(z) - initial_truth_values, ord=sgd_norm)
+                        s.backward()
+                        optimizer.step()
+                        ltn_predictions.append(torch.sigmoid(z))
+                    time_cost = time.time() - start
+                    if verbose:
+                        print(f'LTN-{sgd_method}@{reg_lambda}: {torch.mean(f.satisfaction(ltn_predictions[-1])).tolist()}     Time: {time_cost}')
 
-                results_ltn.append(evaluate(f, ltn_predictions, initial_truth_values, time_cost, base_dict | {
-                    'lambda': reg_lambda,
-                }))
+                    results_ltn.append(evaluate(f, ltn_predictions, initial_truth_values, time_cost, base_dict | {
+                        'lambda': reg_lambda,
+                        'sgd_method': sgd_method,
+                    }))
         print('Problem took {} seconds'.format(time.time() - time_problem_start), flush=True)
 
     print('Saving results...', flush=True)

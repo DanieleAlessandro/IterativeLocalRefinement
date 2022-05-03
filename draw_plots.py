@@ -38,17 +38,18 @@ def generate_plots(key, title, y_label, file_name, basepath, axs=None, plot_row=
 
 
         for reg_l in regularization_lambda_list:
-            fuzzy_sat_ltn = np.mean(np.array([p[key]
-                                              for p in results_ltn
-                                              if p['target'] == t and p['lambda'] == reg_l]), axis=0)
+            for sgd_method in sgd_methods:
+                fuzzy_sat_ltn = np.mean(np.array([p[key]
+                                                  for p in results_ltn
+                                                  if p['target'] == t and p['lambda'] == reg_l and p['sgd_method'] == sgd_method] ), axis=0)
 
-            if grid:
-                axs[plot_row, plot_column].plot(x_axis, fuzzy_sat_ltn, ls='--', label='SGD reg=' + str(reg_l))
-            else:
-                plt.plot(x_axis, fuzzy_sat_ltn, ls='--', label='SGD reg=' + str(reg_l))
+                if grid:
+                    axs[plot_row, plot_column].plot(x_axis, fuzzy_sat_ltn, ls='--', label=f'{sgd_method} reg={reg_l}')
+                else:
+                    plt.plot(x_axis, fuzzy_sat_ltn, ls='--', label=f'{sgd_method} reg={reg_l}')
 
         if grid:
-            axs[plot_row, plot_column].set_title(title)
+            axs[plot_row, plot_column].set_title(title + (f' (w={t})' if key == 'sat_f' else ''))
         else:
             plt.legend(bbox_to_anchor=(1.45, 0.9), loc='upper right')
             plt.savefig(f'{basepath}/w_{t}/{file_name}.png', bbox_inches="tight")
@@ -67,12 +68,12 @@ def create_figures(grid, base_path, tnorm, amt_rulez):
     else:
         axes = None
 
-    generate_plots('sat_f', 'Satisfaction (fuzzy logic)', 'fuzzy sat', 'sat_f', base_path, axs=axes, plot_row=0, grid=grid)
-    generate_plots('norm1_f', 'L1 norm (fuzzy logic)', 'L1 norm', 'fuzzy_norm1', base_path, axs=axes, plot_row=1, grid=grid)
-    generate_plots('norm2_f', 'L2 norm (fuzzy logic)', 'L2 norm', 'fuzzy_norm2', base_path, axs=axes, plot_row=2, grid=grid)
-    generate_plots('sat_c', 'Satisfaction (classic logic)', 'sat', 'sat_c', base_path, axs=axes, plot_row=3, grid=grid)
-    generate_plots('n_clauses_satisfied_c', 'Proportion of satisfied clauses (classic logic)', 'n sat', 'n_clauses', base_path, axs=axes, plot_row=4, grid=grid)
-    generate_plots('norm_c', 'L1 norm (classic logic)', 'L1 norm', 'crisp_norm', base_path, axs=axes, plot_row=5, grid=grid)
+    generate_plots('sat_f', 'Satisfaction', 'fuzzy sat', 'sat_f', base_path, axs=axes, plot_row=0, grid=grid)
+    generate_plots('norm2_f', 'L2 norm', 'L2 norm', 'fuzzy_norm2', base_path, axs=axes, plot_row=1, grid=grid)
+    generate_plots('norm1_f', 'L1 norm', 'L1 norm', 'fuzzy_norm1', base_path, axs=axes, plot_row=2, grid=grid)
+    generate_plots('sat_c', 'Satisfaction (crisp)', 'sat', 'sat_c', base_path, axs=axes, plot_row=3, grid=grid)
+    generate_plots('n_clauses_satisfied_c', 'Proportion of satisfied clauses (crisp)', 'n sat', 'n_clauses', base_path, axs=axes, plot_row=4, grid=grid)
+    generate_plots('norm_c', 'L1 norm (crisp)', 'L1 norm', 'crisp_norm', base_path, axs=axes, plot_row=5, grid=grid)
 
     if grid:
         fig.savefig(f'plots/results_{tnorm}_{amt_rulez}.png')
