@@ -17,6 +17,7 @@ class LRL(torch.nn.Module):
         prev_satisfaction = torch.tensor(10000.)
         for i in range(self.max_iterations):
             satisfaction = self.formula.forward(truth_values)
+            # print(satisfaction)
             satisfactions.append(satisfaction)
 
             # Convergence criterion has an hyperparameter. Make sure it's not too small.

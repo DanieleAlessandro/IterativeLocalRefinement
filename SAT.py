@@ -39,6 +39,8 @@ list_of_files = os.listdir('uf20-91')[:n_formulas]
 device = torch.device("cuda") if use_cuda and torch.cuda.is_available() else torch.device("cpu")
 print(device)
 
+print(tnorm)
+
 if verbose:
     print(list_of_files)
 
