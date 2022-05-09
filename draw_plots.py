@@ -98,6 +98,7 @@ for amt_rulez in amt_rules:
         with open(f'results/{tnorm}/ltn_{amt_rulez}_rules', 'rb') as f:
             results_ltn = pickle.load(f)
 
+        print(f'Creating figures for {tnorm} with {amt_rulez}', flush=True)
         create_figures(False, base_path, tnorm, amt_rulez)
         create_figures(True, base_path, tnorm, amt_rulez)
 

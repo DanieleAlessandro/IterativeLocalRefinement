@@ -6,6 +6,9 @@ from abc import ABC, abstractmethod
 from Formula import Formula
 from torch_scatter import scatter_max, scatter_min, scatter_sum
 
+from settings import test_correctness
+
+
 def aggregate_mean(delta_literals: torch.Tensor, prop_index: torch.Tensor, props=20) -> torch.Tensor:
     # Uses the mean to combine the deltas on the same proposition
     # How to compute the mean on nonzero values: Take the sum (scatter_add), then count amount of nonzero values
@@ -154,6 +157,7 @@ class SATLukasiewicz(SATTNorm):
 
         # Find the delta_M for each M
         M = torch.arange(1, n+1)
+        l = torch.cumsum(sorted_clauses[0], dim=-1)
         delta_M = (w + M - 1 - torch.cumsum(sorted_clauses[0], dim=-1)) / M
 
         # TODO: This is _usually_ the same as the code below, except it sometimes makes mistakes especially for w=1
@@ -168,19 +172,30 @@ class SATLukasiewicz(SATTNorm):
         # If the condition holds for all clauses, then the max index is the last one
         M_star[cond.all(dim=-1)] = n - 1
         delta_M_star = torch.gather(delta_M, -1, M_star.unsqueeze(-1))
-        # if not (torch.logical_or(M_star == M_star_new, delta_M_star[0].squeeze(-1) < 0)).all():
-        #    i = 0
 
         # Assign the respective deltas to the clause truth values
         delta_sorted_clauses = torch.where(cond, delta_M_star, 1 - sorted_clauses[0])
         delta_clauses = scatter_sum(delta_sorted_clauses, sorted_clauses[1], -1)
-        # if not (delta_clauses_new == delta_clauses).all():
-        #    i = 0
 
         # Compute the t-conorm boost function
         clauses_w = self.clause_t + delta_clauses
-        delta_literals = (torch.clip(clauses_w - torch.sum(self.indexed_t, dim=-1), min=0) / 3.0).unsqueeze(-1) * sign
 
+        if test_correctness:
+            new_w = torch.clip(torch.sum(clauses_w, dim=-1) - (n-1), 0, 1)
+            assert (clauses_w <= 1.0).all() and (clauses_w >= 0.0).all()
+            assert (new_w <= 1.0).all() and (new_w >= 0.0).all()
+            assert torch.logical_or(delta < 0, torch.isclose(new_w, w.squeeze(-1), atol=1e-4)).all(), (new_w, w, delta < 0)
+
+        delta_literals = (torch.clip(clauses_w - torch.sum(self.indexed_t, dim=-1), min=0) / 3.0).unsqueeze(-1)
+
+        if test_correctness:
+            new_literals = self.indexed_t + delta_literals
+            new_w = torch.clip(torch.sum(new_literals, dim=-1), 0, 1)
+            assert (new_literals <= 1.0).all() and (new_literals >= 0.0).all()
+            assert (new_w <= 1.0).all() and (new_w >= 0.0).all()
+            assert torch.logical_or(delta.unsqueeze(-1) < 0, torch.isclose(new_w, clauses_w)).all(), (new_w, clauses_w, delta < 0)
+
+        delta_literals = delta_literals * sign
         # Distribute the deltas over the propositions using the mean aggregation
         prop_index_expand = prop_index.unsqueeze(0).expand(delta_literals.shape).flatten(1, 2)
         delta_literals_flat = delta_literals.flatten(1, 2)
@@ -194,6 +209,12 @@ class SATLukasiewicz(SATTNorm):
         n = self.clause_t.shape[-1]
         delta_clauses = torch.clip(w - 1 + n - torch.sum(self.clause_t, dim=-1), max=0) / n
         w_clauses = (self.clause_t + delta_clauses.unsqueeze(-1)).unsqueeze(-1)
+
+        if test_correctness:
+            new_w = torch.clip(torch.sum(w_clauses.squeeze(-1), dim=-1) - (n-1), 0, 1)
+            assert (w_clauses <= 1.0).all() and (w_clauses >= 0.0).all()
+            assert (new_w <= 1.0).all() and (new_w >= 0.0).all()
+            assert torch.logical_or(delta > 0, torch.isclose(new_w, w.squeeze(-1), atol=1e-4)).all(), (new_w, w, delta > 0)
 
         sorted_literals = torch.sort(self.indexed_t, dim=-1, descending=True)
         n_literals = self.indexed_t[0].shape[-1]
@@ -216,8 +237,17 @@ class SATLukasiewicz(SATTNorm):
         delta_M_star = torch.gather(delta_M, -1, M_star.unsqueeze(-1))
 
         # Assign the respective deltas to the clause truth values
-        delta_sorted_literals = torch.where(cond, -delta_M_star, -sorted_literals[0])
+        delta_sorted_literals = torch.where(cond, delta_M_star, -sorted_literals[0])
         delta_literals = scatter_sum(delta_sorted_literals, sorted_literals[1], -1)
+
+        if test_correctness:
+            new_literals = self.indexed_t + delta_literals
+            new_w = torch.clip(torch.sum(new_literals, dim=-1), 0, 1)
+            assert (new_literals <= 1.0).all() and (new_literals >= 0.0).all()
+            assert (new_w <= 1.0).all() and (new_w >= 0.0).all()
+            assert torch.logical_or(delta.unsqueeze(-1) > 0, torch.isclose(new_w, w_clauses.squeeze(-1))).all(), (new_w, w_clauses.squeeze(-1), delta > 0)
+
+        delta_literals = delta_literals * sign
 
         # Distribute the deltas over the propositions using the mean aggregation
         prop_index_expand = prop_index.unsqueeze(0).expand(delta_literals.shape).flatten(1, 2)
@@ -272,14 +302,21 @@ class SATProduct(SATTNorm):
         # NEW CODE: Apparently, the smallest lambda finds exactly the same as i_lambda in the previous snippet
         # We don't have a proof for this but it works...
         chosen_lambdas = torch.min(lamd, dim=-1, keepdim=True)
-        if (chosen_lambdas[1].squeeze(-1) != i_lambda).any():
-            print(chosen_lambdas[1].squeeze(-1), i_lambda)
+        # if (chosen_lambdas[1].squeeze(-1) != i_lambda).any():
+        #     print(chosen_lambdas[1].squeeze(-1), i_lambda)
         delta_clauses = torch.where(self.clause_t < chosen_lambdas[0], chosen_lambdas[0] - self.clause_t, torch.tensor(0.0))
+
+        clauses_w = self.clause_t + delta_clauses
+
+        if test_correctness:
+            new_w = torch.prod(clauses_w, dim=-1)
+            assert (clauses_w <= 1.0).all() and (clauses_w >= 0.0).all()
+            assert (new_w <= 1.0).all() and (new_w >= 0.0).all()
+            assert torch.logical_or(delta < 0, torch.isclose(new_w, w.squeeze(-1))).all(), (new_w, delta < 0)
 
         # TODO: Check that chosen_lambdas[1] == i_lambda
 
         # Compute the t-conorm boost function
-        clauses_w = self.clause_t + delta_clauses
         # Note: This code is equal to that of the Godel!
         max_literals = self.indexed_t.max(dim=-1)
         max_indices = max_literals[1].unsqueeze(-1)
@@ -287,13 +324,22 @@ class SATProduct(SATTNorm):
         # We multiply here with 1 - max_literals so that it is excluded from the division
         # TODO: What if the divisor approaches 0 if the clause is almost satisfied?
         delta_divisor = (1 - max_literals[0]) * (1-clauses_w) / (torch.prod(1 - self.indexed_t, dim=-1) + 1e-10)
-        delta_max_literal = (1 - max_literals[0] - delta_divisor
-                             ) * torch.take_along_dim(sign.unsqueeze(0), max_indices, -1).squeeze()
+        delta_max_literal = (1 - max_literals[0] - delta_divisor)
 
+        if test_correctness:
+            new_literals = self.indexed_t.clone()
+            mask = torch.arange(3).reshape(1, 1, 3) == max_indices
+            new_literals[mask] = new_literals[mask] + delta_max_literal.flatten()
+            new_w = 1 - torch.prod(1 - new_literals, dim=-1)
+            assert (new_literals <= 1.0).all() and (new_literals >= 0.0).all()
+            assert (new_w <= 1.0).all() and (new_w >= 0.0).all()
+            assert torch.logical_or(delta.unsqueeze(-1) < 0, torch.isclose(new_w, clauses_w)).all(), (new_w, clauses_w, delta < 0)
+
+        delta_max_prop = delta_max_literal * torch.take_along_dim(sign.unsqueeze(0), max_indices, -1).squeeze()
         # Find what propositions the results belong to
         propositions_max_indices = torch.take_along_dim(prop_index.unsqueeze(0), max_indices, -1).squeeze()
 
-        prop_deltas = aggregate(delta_max_literal, propositions_max_indices, self.aggregate_func)
+        prop_deltas = aggregate(delta_max_prop, propositions_max_indices, self.aggregate_func)
 
         return prop_deltas
 
@@ -304,16 +350,22 @@ class SATProduct(SATTNorm):
         min_clause = torch.min(self.clause_t, dim=-1)
         w_min_clause = min_clause[0] * w / self.formula_t
 
+        if test_correctness:
+            new_w = w_min_clause * self.formula_t / min_clause[0]
+            assert torch.logical_or(delta > 0, w_min_clause <= 1.0).all() and (w_min_clause >= 0.0).all()
+            assert (new_w <= 1.0).all() and (new_w >= 0.0).all()
+            assert torch.logical_or(delta > 0, torch.isclose(new_w, w.squeeze(-1))).all(), (new_w, delta > 0)
+
         # Compute the t-conorm boost function
         min_clause_literals = self.indexed_t[range(self.indexed_t.shape[0]), min_clause[1]]
-        sorted_literals = torch.sort(min_clause_literals, dim=-1, descending=False)
-        n = sorted_literals[0].shape[-1]
-        onez = torch.ones(sorted_literals[0].shape[0], 1)
+        sorted_literals = torch.sort(min_clause_literals, dim=-1, descending=False)[0]
+        n = sorted_literals.shape[-1]
+        onez = torch.ones(sorted_literals.shape[0], 1)
 
         # Compute the truth value lambda for each clause
         # We make the assumption that there is at least one nonzero value, ie N does not contain all integers.
         lamd = 1. - torch.pow(
-            (1 - w_min_clause.unsqueeze(-1)) / torch.cat([onez, torch.cumprod(1.0 - sorted_literals[0][..., :-1], dim=-1)], dim=-1),
+            (1 - w_min_clause.unsqueeze(-1)) / torch.cat([onez, torch.cumprod(1.0 - sorted_literals[..., :-1], dim=-1)], dim=-1),
             1 / (n - torch.arange(0, n).unsqueeze(0)))
 
         # OLD CODE: This should compute the same thing but is slower
@@ -329,12 +381,20 @@ class SATProduct(SATTNorm):
         # NEW CODE: Apparently, the smallest lambda finds exactly the same as i_lambda in the previous snippet
         # We don't have a proof for this but it works...
         chosen_lambdas = torch.max(lamd, dim=-1, keepdim=True)[0]
-        delta_sorted_literals = torch.where(min_clause_literals > chosen_lambdas,
+        delta_min_clause_literals = torch.where(min_clause_literals > chosen_lambdas,
                                             chosen_lambdas - min_clause_literals,
-                                            torch.tensor(0.0)) * sign[min_clause[1]]
+                                            torch.tensor(0.0))
+
+        if test_correctness:
+            new_literals = min_clause_literals + delta_min_clause_literals
+            new_w = 1 - torch.prod(1 - new_literals, dim=-1)
+            assert (new_literals <= 1.0).all() and (new_literals >= 0.0).all()
+            assert (new_w <= 1.0).all() and (new_w >= 0.0).all()
+            assert torch.logical_or(delta > 0, torch.isclose(new_w, w_min_clause)).all(), (new_w, w_min_clause, delta > 0)
+
 
         prop_index_max = prop_index[min_clause[1]]
-        prop_deltas = aggregate(delta_sorted_literals, prop_index_max, self.aggregate_func)
+        prop_deltas = aggregate(delta_min_clause_literals * sign[min_clause[1]], prop_index_max, self.aggregate_func)
 
         return prop_deltas
 
