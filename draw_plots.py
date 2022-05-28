@@ -7,7 +7,7 @@ import os
 
 
 
-def generate_plots(key, title, y_label, file_name, basepath, axs=None, plot_row=None, grid=True):
+def generate_plots(key, title, y_label, file_name, basepath, axs=None, plot_row=None, grid=True, aggregate='mean'):
     if not grid:
         plt.rcParams["figure.figsize"] = (8.5, 5)
         plt.title(title)
@@ -29,24 +29,30 @@ def generate_plots(key, title, y_label, file_name, basepath, axs=None, plot_row=
                             to_fill = n_steps + 1 - len(fuzzy_sat_lrl)
                             fuzzy_sat_lrl = np.concatenate([fuzzy_sat_lrl, np.array([fuzzy_sat_lrl[-1]] * to_fill)])
                         l_results.append(fuzzy_sat_lrl)
-                sat_mean = np.stack(l_results).mean(axis=0)
+                if aggregate == 'mean':
+                    sat_mean = np.stack(l_results).mean(axis=0)
+                if aggregate == 'mse':
+                    sat_mean = np.sqrt(np.square(t - np.stack(l_results)).mean(axis=0))
                 label = f'LRL s={lrl_schedule} m={method}'
                 if grid:
                     axs[plot_row, plot_column].plot(x_axis, sat_mean, label=label)
                 else:
                     plt.plot(x_axis, sat_mean, label=label)
 
-
         for reg_l in regularization_lambda_list:
             for sgd_method in sgd_methods:
-                fuzzy_sat_ltn = np.mean(np.array([p[key]
-                                                  for p in results_ltn
-                                                  if p['target'] == t and p['lambda'] == reg_l and p['sgd_method'] == sgd_method] ), axis=0)
+                fuzzy_sat_ltn = np.array([p[key]
+                                          for p in results_ltn
+                                          if p['target'] == t and p['lambda'] == reg_l and p['sgd_method'] == sgd_method])
 
+                if aggregate == 'mean':
+                    sat_mean = fuzzy_sat_ltn.mean(axis=0)
+                if aggregate == 'mse':
+                    sat_mean = np.sqrt(np.square(t - fuzzy_sat_ltn).mean(axis=0))
                 if grid:
-                    axs[plot_row, plot_column].plot(x_axis, fuzzy_sat_ltn, ls='--', label=f'{sgd_method} reg={reg_l}')
+                    axs[plot_row, plot_column].plot(x_axis, sat_mean, ls='--', label=f'{sgd_method} reg={reg_l}')
                 else:
-                    plt.plot(x_axis, fuzzy_sat_ltn, ls='--', label=f'{sgd_method} reg={reg_l}')
+                    plt.plot(x_axis, sat_mean, ls='--', label=f'{sgd_method} reg={reg_l}')
 
         if grid:
             axs[plot_row, plot_column].set_title(title + (f' (w={t})' if key == 'sat_f' else ''))
@@ -68,7 +74,7 @@ def create_figures(grid, base_path, tnorm, amt_rulez):
     else:
         axes = None
 
-    generate_plots('sat_f', 'Satisfaction', 'fuzzy sat', 'sat_f', base_path, axs=axes, plot_row=0, grid=grid)
+    generate_plots('sat_f', 'RMSE to satisfaction', 'fuzzy sat', 'sat_f', base_path, axs=axes, plot_row=0, grid=grid, aggregate='mse')
     generate_plots('norm2_f', 'L2 norm', 'L2 norm', 'fuzzy_norm2', base_path, axs=axes, plot_row=1, grid=grid)
     generate_plots('norm1_f', 'L1 norm', 'L1 norm', 'fuzzy_norm1', base_path, axs=axes, plot_row=2, grid=grid)
     generate_plots('sat_c', 'Satisfaction (crisp)', 'sat', 'sat_c', base_path, axs=axes, plot_row=3, grid=grid)
