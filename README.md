@@ -18,3 +18,10 @@ python draw_plots.py
 
 # Change the settings
 To modify the settings of the experiments, change the file settings.py.
+
+## License
+
+Copyright (c) 2022, Daniele Alessandro, Emile van Krieken
+All rights reserved.
+
+Licensed under the MIT License.
