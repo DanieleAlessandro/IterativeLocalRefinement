@@ -94,11 +94,7 @@ results_ltn = None
 
 def create_figures(axes, col, tnorm, target):
     generate_plots('sat_f', f'Satisfaction ({tnorm.capitalize()})', axs=axes, plot_row=0, plot_col=col, aggregate='mean', target=target)
-    # generate_plots('norm2_f', 'L2 norm', 'L2 norm', 'fuzzy_norm2', base_path, axs=axes, plot_row=1, grid=grid)
     generate_plots('norm1_f', f'L1 norm ({tnorm.capitalize()})', axs=axes, plot_row=1, plot_col=col, target=target)
-    # generate_plots('sat_c', 'Satisfaction (crisp)', 'sat', 'sat_c', base_path, axs=axes, plot_row=3, grid=grid)
-    # generate_plots('n_clauses_satisfied_c', 'Proportion of satisfied clauses (crisp)', 'n sat', 'n_clauses', base_path, axs=axes, plot_row=4, grid=grid)
-    # generate_plots('norm_c', 'L1 norm (crisp)', 'L1 norm', 'crisp_norm', base_path, axs=axes, plot_row=5, grid=grid)
 
 
 for amt_rulez in [20, 91]:
