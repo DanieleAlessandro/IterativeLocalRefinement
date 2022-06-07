@@ -25,4 +25,5 @@ test_correctness = True
 use_cuda = False
 
 # Plotting
+target = 1.0
 tnorms_plot = ["godel", "lukasiewicz", "product"]

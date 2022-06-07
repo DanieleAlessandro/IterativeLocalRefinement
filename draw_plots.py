@@ -101,8 +101,6 @@ def create_figures(axes, col, tnorm, target):
     # generate_plots('norm_c', 'L1 norm (crisp)', 'L1 norm', 'crisp_norm', base_path, axs=axes, plot_row=5, grid=grid)
 
 
-
-target = 1.0
 for amt_rulez in [20, 91]:
     plt.rcParams["figure.figsize"] = (28, 10)
     plt.subplots_adjust(right=0.7)
