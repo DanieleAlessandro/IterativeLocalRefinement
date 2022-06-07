@@ -54,5 +54,3 @@ else:
     print(torch.sigmoid(z))
     print('Satisfaction of the constraints:')
     print(m(z))
-
-# TODO: capire perche valori di verita negativi per LRL

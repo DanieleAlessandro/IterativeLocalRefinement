@@ -1,10 +1,6 @@
 from Godel import *
 from Formula import *
 
-# TODO: idea: randomized BFs -> t-conorm: softmax used to sample the value to be increased
-# TODO: understand KENN with different formulas
-# TODO: idea: change randomly a solution where a subformula is not satisfied -> just maxsat, TBFs allows to move faster (the initial random solution can be changed)
-
 A = Predicate('A', torch.tensor([[0.1,0.5,0,0.8]]).t())
 B = Predicate('B', torch.tensor([[0.4,0.2,0.6,0.1]]).t())
 C = Predicate('C', torch.tensor([[0.6,0.1,0.8,0.5]]).t())

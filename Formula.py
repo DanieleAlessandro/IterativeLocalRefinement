@@ -23,7 +23,7 @@ class Formula(torch.nn.Module):
     def get_name(self, parenthesis=False):
         pass
 
-    def print_table(self):  # TODO: check/fix
+    def print_table(self):  # TODO: fix
         header = []
         for sf in self.sub_formulas:
             header.append(sf.get_name(parenthesis=True))

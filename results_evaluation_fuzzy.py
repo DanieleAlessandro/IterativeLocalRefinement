@@ -2,12 +2,10 @@ import pickle
 from utils import *
 import matplotlib.pyplot as plt
 
-# TODO: aggiungere seed
 
 # Settings
 n_trials = 1000
 n_steps = 100
-# TODO move settings in a different file
 
 with open('results', 'rb') as f:
     sat_results = pickle.load(f)

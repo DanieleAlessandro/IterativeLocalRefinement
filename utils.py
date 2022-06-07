@@ -47,7 +47,7 @@ def initialize_pre_activations(number_of_variables, number_of_trials, device):
 
     yield z
     while True:
-        yield torch.nn.Parameter(torch.clone(z), requires_grad=True)  # TODO: check if it works properly
+        yield torch.nn.Parameter(torch.clone(z), requires_grad=True)
 
 
 def create_predicates(number_of_variables):

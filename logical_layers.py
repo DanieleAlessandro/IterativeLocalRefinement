@@ -25,7 +25,6 @@ class LRL(torch.nn.Module):
             if i > self.min_iterations and torch.sum(condition.int()) == 0:
                 break
 
-            # TODO: What about this weird parameter here? It seems to really smooth out the trajectory
             # delta_sat = torch.where(target - satisfaction > 0, (target - satisfaction).double(), 0.).float() * self.schedule
             active_mask = (w - satisfaction).abs() > self.conv_condition
             # print((w - satisfaction).abs(), (w - prev_satisfaction).abs())

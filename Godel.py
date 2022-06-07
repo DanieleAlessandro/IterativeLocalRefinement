@@ -58,17 +58,6 @@ class OR(Formula):
         return torch.unsqueeze(m, 0).t()
 
     def boost_function(self, truth_values, delta):
-        # TODO: remove or substitute: here if two values are both the maximum, it choose randomly which one to increase
-        #   - slower
-        #   - it should always reach a solution (if such a solution exists) with w=1 for the SAT problem
-        # indexes = []
-        # for row in truth_values:
-        #     indexes.append(np.random.choice(torch.flatten(torch.argwhere(row == torch.max(row)))))
-        #
-        # # am = torch.argmax(truth_values, 1)
-        # indexes = torch.tensor(np.array(indexes, dtype=np.int64))
-        # return torch.nn.functional.one_hot(indexes, truth_values.shape[1]) * delta
-
         am = torch.argmax(truth_values, 1)
 
         return torch.nn.functional.one_hot(am, truth_values.shape[1]) * delta
