@@ -38,7 +38,7 @@ def find_color_ltn(method, l):
 
 
 def find_label_lrl(method, schedule):
-    return 'ILR ({},{})'.format(method, schedule)
+    return 'ILR ({})'.format(schedule)
 
 
 def find_label_ltn(method, l):
@@ -85,11 +85,11 @@ def generate_plots(key, title, axs, plot_row, plot_col, aggregate='mean', target
                                          color=find_color_ltn(sgd_method, reg_l),
                                          label=find_label_ltn(sgd_method, reg_l))
 
-    axs[plot_row, plot_col].set_title(title)
+    axs[plot_row, plot_col].set_title(title, fontweight='bold')
+
 
 results_lrl = None
 results_ltn = None
-
 
 
 def create_figures(axes, col, tnorm, target):
@@ -114,6 +114,17 @@ for amt_rulez in [20, 91]:
                         wspace=0.1,
                         hspace=0.2)
 
+    for ax in axes.flat:
+        ax.set(xlabel='Iteration')
+    axes[0,0].set(ylabel='Satisfaction')
+    axes[0,1].set(ylabel='Satisfaction')
+    axes[1,0].set(ylabel='L1 norm')
+    axes[1,1].set(ylabel='L1 norm')
+
+    # Hide x labels and tick labels for top plots and y ticks for right plots.
+    for ax in axes.flat:
+        ax.label_outer()
+
     for col, tnorm in enumerate(tnorms_plot):
         if not os.path.exists(f'results/{tnorm}/lrl_{amt_rulez}_rules'):
             continue
@@ -134,9 +145,9 @@ for amt_rulez in [20, 91]:
         create_figures(axes, col, tnorm, target)
 
     handles, labels = axes[0,0].get_legend_handles_labels()
-    lg = fig.legend(handles[:10], labels[:10], loc='upper center', ncol=5, prop={'size': 18}, borderaxespad=0.2)
+    lg = fig.legend(handles[:5], labels[:5], loc='upper center', ncol=5, prop={'size': 18}, borderaxespad=0.2)
 
-    fig.savefig(f'plots_final/results_{amt_rulez}_final.png',
+    fig.savefig(f'plots_final/results_{amt_rulez}_{target}_final.png',
                 bbox_extra_artists=(lg,),
                 bbox_inches='tight')
     plt.close()

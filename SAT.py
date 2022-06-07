@@ -14,8 +14,6 @@ random.seed(seed)
 torch.manual_seed(seed)
 np.random.seed(seed)
 
-# TODO:
-#  - NB: w diverso da lr perchè propagato nella backward invece di essere moltiplicato sui nodi
 
 def evaluate(formula, predictions, initial_truth_values, time, hyperparams: dict):
     # Evaluation
@@ -174,7 +172,3 @@ for amt_rulez in amt_rules:
 
     with open(f'results/{tnorm}/ltn_{amt_rulez}_rules', 'wb') as f:
         pickle.dump(results_ltn, f)
-
-# TODO:
-#  - standard deviation over all problems??
-
