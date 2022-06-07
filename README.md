@@ -14,3 +14,7 @@ Run the code for visualization of the results:
 ```
 python draw_plots.py
 ```
+To visualize the results, check the plot folder.
+
+# Change the settings
+To modify the settings of the experiments, change the file settings.py.
