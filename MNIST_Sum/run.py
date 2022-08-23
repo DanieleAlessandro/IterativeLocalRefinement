@@ -50,8 +50,8 @@ for run in range(n_runs):
             test_MNIST(nn, mnist_test_data)
 
     f1 = test_MNIST(nn, mnist_test_data)
-    results_accuracy.append(test_accuracy)
+    results_accuracy.append(test_accuracy.cpu().detach().numpy())
     results_f1.append(f1)
 
-print(f'Average of accuracy in the MNIST sum after {n_runs} runs: {torch.mean(torch.stack(results_accuracy))}')
-print(f'Average of f1 score for the MNIST digits after {n_runs} runs: {np.mean(results_f1)}')
+print(f'Average of accuracy in the MNIST sum after {n_runs} runs: {np.mean(results_accuracy)}, std: {np.std(results_accuracy)}')
+print(f'Average of f1 score for the MNIST digits after {n_runs} runs: {np.mean(results_f1)}, std: {np.std(results_f1)}')
