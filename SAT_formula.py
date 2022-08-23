@@ -160,11 +160,6 @@ class SATLukasiewicz(SATTNorm):
         l = torch.cumsum(sorted_clauses[0], dim=-1)
         delta_M = (w + M - 1 - torch.cumsum(sorted_clauses[0], dim=-1)) / M
 
-        # TODO: This is _usually_ the same as the code below, except it sometimes makes mistakes especially for w=1
-        # delta_M_star = torch.max(delta_M, dim=-1, keepdim=True)
-        # delta_clauses_new = torch.where(1 - self.clause_t > delta_M_star[0], delta_M_star[0], 1 - self.clause_t)
-        # M_star_new = delta_M_star[1].squeeze(-1)
-
         cond = delta_M < 1 - sorted_clauses[0]
         # Do cond - cond (shifted to the left), then take the argmax.
         # This finds the largest index for which the condition is true
@@ -232,7 +227,6 @@ class SATLukasiewicz(SATTNorm):
         # This finds the largest index for which the condition is true
         M_star = torch.argmax(cond.float() - torch.roll(cond.float(), -1, -1), dim=-1)
         # If the condition holds for all literals, then the max index is the last one
-        # TODO: Check this... Seems like it happens frequently
         M_star[cond.all(dim=-1)] = n_literals - 1
         delta_M_star = torch.gather(delta_M, -1, M_star.unsqueeze(-1))
 

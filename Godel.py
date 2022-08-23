@@ -73,3 +73,23 @@ class OR(Formula):
             return '(' + s + ')'
         else:
             return s
+
+
+class IMPLIES(Formula):
+    def function(self, truth_values):
+        return torch.where(truth_values[:, 0:1] > truth_values[:, 1:2], truth_values[:, 1:2].double(), 1.)
+
+    def boost_function(self, truth_values, delta):
+        return torch.where(
+            truth_values[:, 0:1] > truth_values[:, 1:2],
+            torch.concat([torch.zeros_like(truth_values[:, 0:1]),
+                          torch.minimum(truth_values[:, 0:1] - truth_values[:, 1:2], delta)], 1).double(),
+            0.)
+
+    def get_name(self, parenthesis=False):
+        s = self.sub_formulas[0].get_name() + ' -> ' + self.sub_formulas[1].get_name()
+
+        if parenthesis:
+            return '(' + s + ')'
+        else:
+            return s

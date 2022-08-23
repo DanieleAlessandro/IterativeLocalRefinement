@@ -70,7 +70,7 @@ class Formula(torch.nn.Module):
             deltas.append(d)
 
         delta_tensor = torch.zeros_like(truth_values)
-        delta_tensor[..., indices] = torch.concat(deltas, 1)
+        delta_tensor[..., indices] = torch.concat(deltas, 1).type(torch.float)
         return delta_tensor
 
     def reset_deltas(self):
