@@ -38,7 +38,7 @@ To change the amount of training samples, substitute the 3000 with the required 
 ```
 gather_examples(mnist_train_data, 'train_data', 3000)
 ```
-To change the batch size, learning rate, and number of epochs, change the MNIST_Sum/run.py.
+To change the number of epochs, number of runs, learning rate, and batch size, change the MNIST_Sum/run.py.
 
 ## License
 
