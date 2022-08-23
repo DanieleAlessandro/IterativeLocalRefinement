@@ -24,7 +24,7 @@ def test_MNIST(model, dataset, max_digit=10):
         FN = sum(confusion[nr,:])-TP
         F1 += 2*TP/(2*TP+FP+FN)*(FN+TP)/N
     print('F1: ',F1)
-    return [('F1',F1)]
+    return F1
 
 
 def test_sum(model, dataloader):
