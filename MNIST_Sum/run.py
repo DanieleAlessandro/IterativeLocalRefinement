@@ -7,7 +7,7 @@ from dataloader import *
 import time
 
 # Settings
-epochs = 100
+epochs = 30
 n_runs = 10
 learning_rate = 0.01
 batch_size = 128
@@ -20,6 +20,7 @@ test_loader = dataloader('test_data', 5000)
 
 results_accuracy = []
 results_f1 = []
+epoch_times = []
 for run in range(n_runs):
     print(f'Starting run {run}')
 
@@ -43,10 +44,12 @@ for run in range(n_runs):
             optimizer.step()
 
         print(f'End of epoch {e}')
-        print('Epoch time: ', time.time() - epoch_start)
+        epoch_time = time.time() - epoch_start
+        epoch_times.append(epoch_time)
+        print('Epoch time: ', epoch_time)
         test_accuracy = test_sum(LRL, test_loader)
         print('Accuracy in sum task: ' + str(test_accuracy))
-        if e % 5 == 0 and e != 0:
+        if e % 15 == 0 and e != 0:
             test_MNIST(nn, mnist_test_data)
 
     f1 = test_MNIST(nn, mnist_test_data)
@@ -55,3 +58,9 @@ for run in range(n_runs):
 
 print(f'Average of accuracy in the MNIST sum after {n_runs} runs: {np.mean(results_accuracy)}, std: {np.std(results_accuracy)}')
 print(f'Average of f1 score for the MNIST digits after {n_runs} runs: {np.mean(results_f1)}, std: {np.std(results_f1)}')
+print(f'Average seconds per epoch: {np.mean(epoch_times)}')
+
+print('All accuracies')
+print([float(a) for a in results_accuracy])
+print('All f1 scores')
+print(results_f1)
