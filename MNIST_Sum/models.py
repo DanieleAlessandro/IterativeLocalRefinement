@@ -44,5 +44,4 @@ class MNIST_ILRModel(nn.Module):
         x = self.nn(x)
         y = self.nn(y)
         consequents = torch.zeros([x.shape[0], 19])
-        res = self.layer(torch.concat([x,y,consequents], dim=1), 1.0)[:, 20:]
-        return torch.log(res), res
+        return self.layer(torch.concat([x,y,consequents], dim=1), 1.0)[:, 20:]

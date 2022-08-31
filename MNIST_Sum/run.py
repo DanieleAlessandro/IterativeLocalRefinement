@@ -29,7 +29,7 @@ for run in range(n_runs):
     LRL = MNIST_ILRModel(nn, AND(knowledge))
 
     optimizer = torch.optim.Adam(LRL.parameters(), lr=learning_rate)
-    loss = torch.nn.CrossEntropyLoss()
+    loss = torch.nn.BCELoss()
     print('Metrics before training:')
     test_MNIST(nn, mnist_test_data)
     print('Accuracy in sum task:' + str(test_sum(LRL, test_loader)))
@@ -39,7 +39,8 @@ for run in range(n_runs):
         epoch_start = time.time()
         for i,(x,y,l) in enumerate(train_loader):
             optimizer.zero_grad()
-            s_loss = loss(LRL(x, y)[0], torch.squeeze(l))
+
+            s_loss = loss(LRL(x, y), torch.squeeze(l))
             s_loss.backward()
             optimizer.step()
 

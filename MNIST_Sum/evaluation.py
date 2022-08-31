@@ -30,7 +30,7 @@ def test_MNIST(model, dataset, max_digit=10):
 def test_sum(model, dataloader):
     x, y, s = next(iter(dataloader))
 
-    _, prediction = torch.max(model(x, y)[1], 1)
+    _, prediction = torch.max(model(x, y), 1)
     _, label = torch.max(torch.squeeze(s), 1)
 
     return torch.sum(label == prediction) / label.shape[0]
