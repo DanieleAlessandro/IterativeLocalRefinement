@@ -12,10 +12,10 @@ targets = [0.3, 0.5, 0.8, 1]  # list of target truth values for both LRL and LTN
 
 ## LRL
 methods = ['max']  #'mean', 'max']  # list of aggregation methods for LRL
-lrl_schedules = [1.0, 0.1] # The scheduling on the delta of LRL
+lrl_schedules = [0.1, 1.0] # The scheduling on the delta of LRL
 
 ## SGD
-regularization_lambda_list = [0.01, 0.1, 0]  # regularization hyperparameter for LTN
+regularization_lambda_list = [0, 0.01, 0.1]  # regularization hyperparameter for LTN
 sgd_norm = 1 if tnorm == 'product' else 2
 sgd_methods = ['adam']  #['sgd', 'adam']  # list of SGD methods
 # regularization_lambda_list = []  # regularization hyperparameter for LTN

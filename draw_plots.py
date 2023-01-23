@@ -22,9 +22,9 @@ colors_ltn = {
         0: 'orange'
     },
     'adam': {
-        0.01: 'brown',
-        0.1: 'pink',
-        0: 'violet'
+        0: 'red',
+        0.01: 'purple',
+        0.1: 'grey',
     }
 }
 
@@ -85,7 +85,8 @@ def generate_plots(key, title, axs, plot_row, plot_col, aggregate='mean', target
                                          color=find_color_ltn(sgd_method, reg_l),
                                          label=find_label_ltn(sgd_method, reg_l))
 
-    axs[plot_row, plot_col].set_title(title, fontweight='bold')
+    if title:
+        axs[plot_row, plot_col].set_title(title, fontweight='bold')
 
 
 results_lrl = None
@@ -93,12 +94,12 @@ results_ltn = None
 
 
 def create_figures(axes, col, tnorm, target):
-    generate_plots('sat_f', f'Satisfaction ({tnorm.capitalize()})', axs=axes, plot_row=0, plot_col=col, aggregate='mean', target=target)
-    generate_plots('norm1_f', f'L1 norm ({tnorm.capitalize()})', axs=axes, plot_row=1, plot_col=col, target=target)
+    generate_plots('sat_f', tnorm.capitalize(), axs=axes, plot_row=0, plot_col=col, aggregate='mean', target=target)
+    generate_plots('norm1_f', None, axs=axes, plot_row=1, plot_col=col, target=target)
 
 
 for amt_rulez in [20, 91]:
-    plt.rcParams["figure.figsize"] = (28, 10)
+    plt.rcParams["figure.figsize"] = (11,5)
     plt.subplots_adjust(right=0.7)
     fig, axes = plt.subplots(2, 3, sharex='col', sharey='row')
     plt.subplots_adjust(left=0.1,
@@ -110,10 +111,10 @@ for amt_rulez in [20, 91]:
 
     for ax in axes.flat:
         ax.set(xlabel='Iteration')
-    axes[0,0].set(ylabel='Satisfaction')
-    axes[0,1].set(ylabel='Satisfaction')
-    axes[1,0].set(ylabel='L1 norm')
-    axes[1,1].set(ylabel='L1 norm')
+    axes[0,0].set_ylabel('Satisfaction', fontweight='bold')
+    axes[0,1].set_ylabel('Satisfaction', fontweight='bold')
+    axes[1,0].set_ylabel('L1 norm', fontweight='bold')
+    axes[1,1].set_ylabel('L1 norm', fontweight='bold')
 
     # Hide x labels and tick labels for top plots and y ticks for right plots.
     for ax in axes.flat:
@@ -139,7 +140,8 @@ for amt_rulez in [20, 91]:
         create_figures(axes, col, tnorm, target)
 
     handles, labels = axes[0,0].get_legend_handles_labels()
-    lg = fig.legend(handles[:5], labels[:5], loc='upper center', ncol=5, prop={'size': 18}, borderaxespad=0.2)
+    lg = fig.legend(handles[:5], labels[:5], loc='upper center', ncol=5, prop={'size': 12}, borderaxespad=0.2)
+    # lg = fig.legend(handles[:5], labels[:5], loc='upper center', ncol=5, prop={'size': 18}, borderaxespad=0.2)
 
     fig.savefig(f'plots_final/results_{amt_rulez}_{target}_final.png',
                 bbox_extra_artists=(lg,),
